@@ -29,7 +29,6 @@ function parseFact(content: string): { display: string; meta: FactMeta | null } 
 }
 
 function formatTimestamp(iso: string): string {
-  // Backend returns UTC without timezone marker — force UTC parsing, then offset to KST (UTC+9)
   const utc = new Date(iso.endsWith("Z") ? iso : iso + "Z");
   const kst = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
   const yy = kst.getUTCFullYear();
@@ -43,8 +42,8 @@ function formatTimestamp(iso: string): string {
 const GRADE_STYLE: Record<string, string> = {
   S: "text-amber-700 bg-amber-50 border-amber-200",
   A: "text-blue-700 bg-blue-50 border-blue-200",
-  B: "text-slate-600 bg-slate-100 border-slate-200",
-  C: "text-slate-400 bg-slate-50 border-slate-200",
+  B: "text-[#474747] bg-[#f5f5f7] border-[#e8e8ed]",
+  C: "text-[#707070] bg-[#f5f5f7] border-[#e8e8ed]",
 };
 
 const TYPE_STYLE: Record<string, string> = {
@@ -165,7 +164,6 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
           } else if (data.type === "stage2") {
             setAnalyzeProgress({ stage: 2, fact: data.fact!, total: data.total! });
           } else if (data.type === "done") {
-            // 추출+추론+저장 완료 → DB에서 최종 상태 로드 후 표시
             await load();
             resultSet = true;
             setAnalyzeResult({ saved: data.saved ?? 0 });
@@ -259,7 +257,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
       {/* References */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-[#1d1d1f] flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             수집된 레퍼런스 ({refs.length})
           </h3>
@@ -267,16 +265,16 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             <button
               onClick={analyzeWithOllama}
               disabled={analyzing || ollamaStatus === "offline"}
-              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors font-medium flex items-center gap-1.5
+              className={`text-xs px-3 py-1.5 rounded-full border transition-colors font-medium flex items-center gap-1.5
                 ${analyzing
                   ? "bg-purple-50 border-purple-200 text-purple-500 cursor-wait"
                   : ollamaStatus === "offline"
-                  ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                  ? "bg-[#f5f5f7] border-[#e8e8ed] text-[#707070] cursor-not-allowed"
                   : "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"}`}
             >
               {analyzing
                 ? <span className="w-3 h-3 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin flex-shrink-0" />
-                : <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ollamaStatus === "ok" ? "bg-emerald-500" : "bg-slate-300"}`} />
+                : <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ollamaStatus === "ok" ? "bg-emerald-500" : "bg-[#d2d2d7]"}`} />
               }
               {analyzing
                 ? <span className="tabular-nums">
@@ -295,7 +293,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
         </div>
 
         {analyzeResult && (
-          <div className={`mb-3 p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2
+          <div className={`mb-3 p-2.5 rounded-[10px] border text-xs flex items-center justify-between gap-2
             ${analyzeResult.error
               ? "bg-rose-50 border-rose-200 text-rose-600"
               : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}
@@ -309,7 +307,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
         )}
 
         {refs.length === 0 ? (
-          <p className="text-xs text-slate-400 px-1">우측 크롤러에서 버즈리포트를 수집하세요</p>
+          <p className="text-xs text-[#707070] px-1">우측 크롤러에서 버즈리포트를 수집하세요</p>
         ) : (
           <>
             {/* 탭 */}
@@ -324,13 +322,13 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                 <button
                   key={key}
                   onClick={() => { setRefTab(key); setRefPage(0); }}
-                  className={`text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5
+                  className={`text-xs px-2.5 py-1 rounded-[10px] border transition-colors flex items-center gap-1.5
                     ${refTab === key
-                      ? "bg-white border-slate-300 text-slate-800 shadow-sm"
-                      : "bg-transparent border-transparent text-slate-400 hover:text-slate-600"}`}
+                      ? "bg-white border-[#e8e8ed] text-[#1d1d1f]"
+                      : "bg-transparent border-transparent text-[#707070] hover:text-[#1d1d1f]"}`}
                 >
                   {label}
-                  <span className={`text-xs rounded px-1 ${refTab === key ? "bg-slate-100 text-slate-500" : "text-slate-300"}`}>
+                  <span className={`text-xs rounded px-1 ${refTab === key ? "bg-[#f5f5f7] text-[#707070]" : "text-[#d2d2d7]"}`}>
                     {count}
                   </span>
                 </button>
@@ -348,8 +346,8 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                 <>
                   <div className="grid grid-cols-4 gap-2">
                     {list.length === 0 ? (
-                      <div className="col-span-4 flex items-center justify-center h-28 rounded-lg border border-dashed border-slate-200 bg-slate-50">
-                        <p className="text-xs text-slate-400">
+                      <div className="col-span-4 flex items-center justify-center h-28 rounded-[10px] border border-dashed border-[#e8e8ed] bg-[#f5f5f7]">
+                        <p className="text-xs text-[#707070]">
                           {refTab === "pending" ? "분석 전 레퍼런스가 없습니다" : "분석 완료된 레퍼런스가 없습니다"}
                         </p>
                       </div>
@@ -357,28 +355,28 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                       <div
                         key={r.id}
                         onClick={() => !r.analyzed && setActiveRefId(activeRefId === r.id ? null : r.id)}
-                        className={`relative flex flex-col justify-between p-2.5 rounded-lg border text-xs transition-colors h-28
+                        className={`relative flex flex-col justify-between p-2.5 rounded-[10px] border text-xs transition-colors h-28
                           ${r.analyzed
-                            ? "bg-slate-50 border-slate-200 opacity-60"
+                            ? "bg-[#f5f5f7] border-[#e8e8ed] opacity-60"
                             : activeRefId === r.id
                             ? "bg-blue-50 border-blue-200 cursor-pointer"
-                            : "bg-white border-slate-200 hover:border-slate-300 cursor-pointer"}`}
+                            : "bg-white border-[#e8e8ed] hover:border-[#d2d2d7] cursor-pointer"}`}
                       >
                         <div className="flex items-start justify-between gap-1">
-                          <p className="font-medium text-slate-800 leading-snug line-clamp-3 flex-1">{r.title}</p>
+                          <p className="font-medium text-[#1d1d1f] leading-snug line-clamp-3 flex-1">{r.title}</p>
                           <button
                             onClick={(e) => { e.stopPropagation(); setPendingDelete({ type: "ref", id: r.id }); }}
-                            className="text-slate-300 hover:text-rose-500 flex-shrink-0 leading-none"
+                            className="text-[#d2d2d7] hover:text-rose-500 flex-shrink-0 leading-none"
                           >×</button>
                         </div>
-                        <div className="flex items-center justify-between mt-1.5 text-slate-400">
+                        <div className="flex items-center justify-between mt-1.5 text-[#707070]">
                           <span className="truncate">{r.source}</span>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             {r.analyzed && <span className="text-emerald-600 font-medium">완료</span>}
                             {r.url && (
                               <a href={r.url} target="_blank" rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-blue-500 hover:underline">링크</a>
+                                className="text-[#0066cc] hover:underline">링크</a>
                             )}
                           </div>
                         </div>
@@ -386,20 +384,20 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                     ))}
                   </div>
 
-                  {/* 페이지네이션 — 항상 렌더링해 높이 고정 */}
+                  {/* 페이지네이션 */}
                   <div className="flex items-center justify-between mt-2">
                     <button
                       onClick={() => setRefPage((p) => Math.max(0, p - 1))}
                       disabled={refPage === 0}
-                      className="text-xs text-slate-400 hover:text-slate-700 disabled:opacity-0 px-2 py-1 rounded transition-colors"
+                      className="text-xs text-[#707070] hover:text-[#1d1d1f] disabled:opacity-0 px-2 py-1 rounded transition-colors"
                     >← 이전</button>
-                    <span className="text-xs text-slate-400 tabular-nums">
+                    <span className="text-xs text-[#707070] tabular-nums">
                       {refPage + 1} / {totalPages}
                     </span>
                     <button
                       onClick={() => setRefPage((p) => Math.min(totalPages - 1, p + 1))}
                       disabled={refPage === totalPages - 1}
-                      className="text-xs text-slate-400 hover:text-slate-700 disabled:opacity-0 px-2 py-1 rounded transition-colors"
+                      className="text-xs text-[#707070] hover:text-[#1d1d1f] disabled:opacity-0 px-2 py-1 rounded transition-colors"
                     >다음 →</button>
                   </div>
                 </>
@@ -412,32 +410,32 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
       {/* Facts */}
       <section>
         <div className="flex items-center mb-3">
-          <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-[#1d1d1f] flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             유의미한 팩트 ({facts.length})
           </h3>
         </div>
 
         {showBulk && (
-          <div className="mb-3 p-3 bg-slate-50 border border-blue-200 rounded-xl space-y-2">
+          <div className="mb-3 p-3 bg-[#f5f5f7] border border-blue-200 rounded-[10px] space-y-2">
             <p className="text-xs text-blue-600 font-medium">Claude 응답 붙여넣기</p>
-            <p className="text-xs text-slate-400">"팩트 1: ..." 형식으로 붙여넣으면 자동으로 파싱해서 저장합니다</p>
+            <p className="text-xs text-[#707070]">"팩트 1: ..." 형식으로 붙여넣으면 자동으로 파싱해서 저장합니다</p>
             <textarea
               value={bulkInput}
               onChange={(e) => setBulkInput(e.target.value)}
               rows={6}
               placeholder={"팩트 1: 배달 앱 주문 완료 후 사용자 84%가 실시간 위치 추적을 반복 확인한다\n팩트 2: ..."}
-              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400 resize-none font-mono"
+              className="w-full bg-white border border-[#e8e8ed] rounded-[10px] px-3 py-2.5 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] resize-none font-mono"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => { setBulkInput(""); setShowBulk(false); }}
-                className="flex-1 text-xs bg-slate-200 hover:bg-slate-300 text-slate-600 py-2 rounded-lg"
+                className="flex-1 text-xs bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] py-2 rounded-full transition-colors"
               >취소</button>
               <button
                 onClick={addBulkFacts}
                 disabled={!bulkInput.trim()}
-                className="flex-1 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white py-2 rounded-lg font-medium"
+                className="flex-1 text-xs bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-40 text-white py-2 rounded-full font-medium transition-colors"
               >
                 {bulkInput.trim().split("\n").filter(Boolean).length}개 팩트 저장
               </button>
@@ -452,12 +450,12 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             onChange={(e) => setNewFact(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addFact(activeRefId ?? undefined)}
             placeholder="팩트 직접 입력 (Enter)"
-            className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400"
+            className="flex-1 bg-white border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
           />
           <button
             onClick={() => addFact(activeRefId ?? undefined)}
             disabled={!newFact.trim()}
-            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+            className="bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-40 text-white text-sm px-4 py-2 rounded-full transition-colors"
           >추가</button>
         </div>
         {activeRefId && <p className="text-xs text-blue-500 mb-2">선택된 레퍼런스에 연결됨</p>}
@@ -484,22 +482,22 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                     setEditingFw(existing ?? { fact_id: f.id, fact_content: display, why1: "", why2: "", why3: "", why4: "", why5: "", principle: "" });
                   }
                 }}
-                className={`bg-white border border-slate-200 rounded-lg group ${meta ? "cursor-pointer" : ""}`}
+                className={`bg-white border border-[#e8e8ed] rounded-[10px] group ${meta ? "cursor-pointer" : ""}`}
               >
-                <div className="flex items-start gap-2 p-2.5 sticky top-0 z-10 bg-white rounded-t-lg border-b border-transparent" style={{ borderBottomColor: isOpen ? "rgb(241 245 249)" : "transparent" }}>
+                <div className="flex items-start gap-2 p-2.5 sticky top-0 z-10 bg-white rounded-t-[10px] border-b border-transparent" style={{ borderBottomColor: isOpen ? "#f5f5f7" : "transparent" }}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-800 leading-snug">{display}</p>
-                    <p className="text-[10px] text-slate-400 mt-1.5 tabular-nums">{formatTimestamp(f.created_at)}</p>
+                    <p className="text-sm text-[#1d1d1f] leading-snug">{display}</p>
+                    <p className="text-[10px] text-[#707070] mt-1.5 tabular-nums">{formatTimestamp(f.created_at)}</p>
                   </div>
                 </div>
 
                 {isOpen && (meta || editingFw?.fact_id === f.id) && (
                   <div
-                    className="border-t border-slate-100 px-3 py-3 bg-slate-50"
+                    className="border-t border-[#f5f5f7] px-3 py-3 bg-[#f5f5f7]"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className={meta ? "grid grid-cols-[1fr_2fr] gap-x-3" : ""}>
-                      {/* (row1, col1): 배지 */}
+                      {/* 배지 */}
                       {meta && (
                         <div className="flex flex-wrap items-center gap-1.5 pb-3">
                           {meta.grade && (
@@ -513,21 +511,20 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                             </span>
                           )}
                           {meta.insight_grade && meta.insight_grade !== meta.grade && (
-                            <span className="text-xs text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 bg-white flex-shrink-0">
+                            <span className="text-xs text-[#707070] px-1.5 py-0.5 rounded border border-[#e8e8ed] bg-white flex-shrink-0">
                               인사이트 {meta.insight_grade}
                             </span>
                           )}
                         </div>
                       )}
 
-                      {/* (row1, col2): 빈 자리 */}
                       {meta && <div />}
 
-                      {/* (row2, col1): 분류근거 + Gate + 유형 */}
+                      {/* 분류근거 + Gate + 유형 */}
                       {meta && (
                         <div className="space-y-3">
                           {meta.classification_reason && (
-                            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded px-2 py-1.5 border border-slate-100">
+                            <p className="text-xs text-[#474747] leading-relaxed bg-white rounded px-2 py-1.5 border border-[#e8e8ed]">
                               {meta.classification_reason}
                             </p>
                           )}
@@ -536,11 +533,11 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                               const passed = gates.some((p) => p.replace(/\s/g, "") === g.replace(/\s/g, ""));
                               return (
                                 <div key={g} className="flex items-center gap-1.5">
-                                  <span className={`text-xs font-bold flex-shrink-0 w-3 ${passed ? "text-emerald-600" : "text-slate-300"}`}>
+                                  <span className={`text-xs font-bold flex-shrink-0 w-3 ${passed ? "text-emerald-600" : "text-[#d2d2d7]"}`}>
                                     {passed ? "✓" : "✗"}
                                   </span>
-                                  <span className={`text-xs font-semibold mr-0.5 flex-shrink-0 ${passed ? "text-emerald-700" : "text-slate-400"}`}>{g}</span>
-                                  <span className={`text-xs ${passed ? "text-slate-500" : "text-slate-300"}`}>{GATE_DESC[g]}</span>
+                                  <span className={`text-xs font-semibold mr-0.5 flex-shrink-0 ${passed ? "text-emerald-700" : "text-[#707070]"}`}>{g}</span>
+                                  <span className={`text-xs ${passed ? "text-[#707070]" : "text-[#d2d2d7]"}`}>{GATE_DESC[g]}</span>
                                 </div>
                               );
                             })}
@@ -548,15 +545,15 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
 
                           <button
                             onClick={() => setPendingDelete({ type: "fact", id: f.id })}
-                            className="text-xs text-slate-300 hover:text-rose-400 px-4 py-1 rounded-full border border-slate-200 hover:border-rose-200 bg-white transition-colors"
+                            className="text-xs text-[#d2d2d7] hover:text-rose-400 px-4 py-1 rounded-full border border-[#e8e8ed] hover:border-rose-200 bg-white transition-colors"
                           >삭제</button>
                         </div>
                       )}
 
-                      {/* (row2, col2): 5 Whys 컨테이너 */}
+                      {/* 5 Whys 컨테이너 */}
                       <div>
                         {editingFw?.fact_id === f.id ? (
-                          <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 space-y-2">
+                          <div className="bg-blue-50 border border-blue-200 rounded-[10px] px-3 py-3 space-y-2">
                             <p className="text-xs font-semibold text-blue-700 mb-1">5 Whys 역추론</p>
                             {(
                               [
@@ -569,8 +566,8 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                             ).map(({ key, label, desc }) => (
                               <div key={key}>
                                 <label className="text-xs mb-0.5 block">
-                                  <span className="font-medium text-slate-700">{label}</span>
-                                  <span className="text-slate-400"> — {desc}</span>
+                                  <span className="font-medium text-[#1d1d1f]">{label}</span>
+                                  <span className="text-[#707070]"> — {desc}</span>
                                 </label>
                                 <textarea
                                   value={editingFw[key] ?? ""}
@@ -581,7 +578,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                                   }}
                                   rows={2}
                                   placeholder={desc}
-                                  className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400 resize-none overflow-hidden"
+                                  className="w-full bg-white border border-[#e8e8ed] rounded-[10px] px-2 py-1.5 text-xs text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] resize-none overflow-hidden transition-colors"
                                   style={{ height: "auto" }}
                                   ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
                                 />
@@ -590,7 +587,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                             <div>
                               <label className="text-xs mb-0.5 block">
                                 <span className="font-semibold text-amber-600">보편 원리</span>
-                                <span className="text-slate-400"> — 5개 시각의 추론에서 도달한 본질적 원리</span>
+                                <span className="text-[#707070]"> — 5개 시각의 추론에서 도달한 본질적 원리</span>
                               </label>
                               <textarea
                                 value={editingFw.principle ?? ""}
@@ -601,7 +598,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                                 }}
                                 rows={2}
                                 placeholder="5개 시각에서 도달한 본질 원리를 정리하세요"
-                                className="w-full bg-white border border-amber-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-400 resize-none overflow-hidden"
+                                className="w-full bg-white border border-amber-200 rounded-[10px] px-2 py-1.5 text-xs text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-amber-400 resize-none overflow-hidden transition-colors"
                                 style={{ height: "auto" }}
                                 ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
                               />
@@ -609,11 +606,11 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                             <div className="flex gap-2 pt-1">
                               <button
                                 onClick={() => setEditingFw(null)}
-                                className="flex-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 py-1.5 rounded-lg"
+                                className="flex-1 text-xs bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] py-1.5 rounded-full transition-colors"
                               >취소</button>
                               <button
                                 onClick={saveFiveWhys}
-                                className="flex-1 text-xs bg-blue-600 hover:bg-blue-500 text-white py-1.5 rounded-lg font-medium"
+                                className="flex-1 text-xs bg-[#0071e3] hover:bg-[#0077ed] text-white py-1.5 rounded-full font-medium transition-colors"
                               >저장</button>
                             </div>
                           </div>
@@ -621,7 +618,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                           const existing = fiveWhys.find((fw) => fw.fact_id === f.id);
                           if (!existing) return null;
                           return (
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 space-y-2">
+                            <div className="bg-blue-50 border border-blue-200 rounded-[10px] px-3 py-3 space-y-2">
                               <p className="text-xs font-semibold text-blue-700 mb-1">5 Whys 역추론</p>
                               {(
                                 [
@@ -633,12 +630,12 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                                 ]
                               ).map(({ key, label }) => existing[key] ? (
                                 <div key={key}>
-                                  <p className="text-xs text-slate-400 mb-0.5">{label}</p>
-                                  <p className="text-xs text-slate-700 leading-relaxed">{existing[key]}</p>
+                                  <p className="text-xs text-[#707070] mb-0.5">{label}</p>
+                                  <p className="text-xs text-[#1d1d1f] leading-relaxed">{existing[key]}</p>
                                 </div>
                               ) : null)}
                               {existing.principle && (
-                                <div className="mt-1 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="mt-1 p-2 bg-amber-50 border border-amber-200 rounded-[10px]">
                                   <p className="text-xs font-semibold text-amber-600 mb-0.5">보편 원리</p>
                                   <p className="text-xs text-amber-800 leading-relaxed">{existing.principle}</p>
                                 </div>
@@ -654,7 +651,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             );
           })}
           {facts.length === 0 && (
-            <p className="text-xs text-slate-400 px-1">팩트가 없습니다. 레퍼런스를 분석하거나 직접 입력하세요.</p>
+            <p className="text-xs text-[#707070] px-1">팩트가 없습니다. 레퍼런스를 분석하거나 직접 입력하세요.</p>
           )}
         </div>
       </section>
@@ -663,21 +660,21 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
       {/* Principles */}
       {principles.length > 0 && (
         <section>
-          <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-[#1d1d1f] mb-3 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             추출된 혁신 원리 ({principles.length})
           </h3>
           <div className="space-y-2">
             {principles.map((fw) => (
-              <div key={fw.id} className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div key={fw.id} className="p-3 bg-amber-50 border border-amber-200 rounded-[10px]">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm text-amber-800">{fw.principle}</p>
-                  <button onClick={() => setPendingDelete({ type: "fw", id: fw.id })} className="text-slate-300 hover:text-rose-500 text-xs flex-shrink-0">×</button>
+                  <button onClick={() => setPendingDelete({ type: "fw", id: fw.id })} className="text-[#d2d2d7] hover:text-rose-500 text-xs flex-shrink-0">×</button>
                 </div>
-                {fw.fact_content && <p className="text-xs text-slate-500 mt-1.5">팩트: {fw.fact_content}</p>}
+                {fw.fact_content && <p className="text-xs text-[#707070] mt-1.5">팩트: {fw.fact_content}</p>}
                 <button
                   onClick={() => setEditingFw(fw)}
-                  className="text-xs text-slate-400 hover:text-blue-500 mt-1"
+                  className="text-xs text-[#707070] hover:text-[#0066cc] mt-1 transition-colors"
                 >5 Whys 보기</button>
               </div>
             ))}
@@ -686,23 +683,23 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
       )}
       {pendingDelete && (
         <div
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-[#1d1d1f]/20 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setPendingDelete(null)}
         >
           <div
-            className="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-xs shadow-lg"
+            className="bg-white rounded-[28px] p-6 w-full max-w-xs"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-sm font-semibold text-slate-800 mb-1">삭제하시겠어요?</p>
-            <p className="text-xs text-slate-400 mb-4">삭제된 항목은 복구할 수 없습니다.</p>
+            <p className="text-sm font-semibold text-[#1d1d1f] mb-1">삭제하시겠어요?</p>
+            <p className="text-xs text-[#707070] mb-4">삭제된 항목은 복구할 수 없습니다.</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setPendingDelete(null)}
-                className="flex-1 text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 rounded-lg transition-colors"
+                className="flex-1 text-sm bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] py-2 rounded-full transition-colors"
               >취소</button>
               <button
                 onClick={confirmDelete}
-                className="flex-1 text-sm bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-lg font-medium transition-colors"
+                className="flex-1 text-sm bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-full font-medium transition-colors"
               >삭제</button>
             </div>
           </div>

@@ -111,7 +111,7 @@ export default function HomePage() {
     setPinnedIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      localStorage.setItem(LS_PINNED, JSON.stringify([...next]));
+      localStorage.setItem(LS_PINNED, JSON.stringify(Array.from(next)));
       return next;
     });
   }
@@ -142,38 +142,38 @@ export default function HomePage() {
   const stageInfo = (n: number) => STAGES.find((s) => s.id === n) ?? STAGES[0];
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA]">
+    <div className="min-h-screen bg-[#f5f5f7]">
       {/* Header */}
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-[#e8e8ed] bg-white/80 backdrop-blur-xl sticky top-0 z-10">
+        <div className="max-w-[1200px] mx-auto px-6 h-11 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-slate-900">UXER Kyle's Design Workflow Agent</h1>
-            <p className="text-xs text-slate-400 mt-0.5">목적 탐지 → 맥락 파악 → 사람 이해 → 추상 진입 → 솔루션 도출</p>
+            <h1 className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight">UXER Kyle's Design Workflow Agent</h1>
+            <p className="text-[11px] text-[#707070] mt-0.5">목적 탐지 → 맥락 파악 → 사람 이해 → 추상 진입 → 솔루션 도출</p>
           </div>
           <button
             onClick={() => setShowForm(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="bg-[#0071e3] hover:bg-[#0077ed] text-white text-[13px] font-normal px-4 py-1.5 rounded-full transition-colors"
           >
             + 새 프로젝트
           </button>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-10">
+      <main className="max-w-[1200px] mx-auto px-6 py-10">
         {/* Workflow Overview */}
-        <div className="mb-10 bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100">
-            <p className="text-xs text-slate-400 uppercase tracking-wider">워크플로우</p>
+        <div className="mb-10 bg-white rounded-[28px] overflow-hidden">
+          <div className="px-5 py-3 border-b border-[#f5f5f7]">
+            <p className="text-[11px] text-[#707070] uppercase tracking-wider">워크플로우</p>
           </div>
-          <div className="grid grid-cols-5 divide-x divide-slate-100">
-            {STAGES.map((stage, i) => (
+          <div className="grid grid-cols-5 divide-x divide-[#e8e8ed]">
+            {STAGES.map((stage) => (
               <div key={stage.id} className="relative flex flex-col gap-2 px-4 py-4">
                 <div className={`absolute top-0 left-0 right-0 h-0.5 ${STAGE_COLORS[stage.color]}`} />
                 <div className="flex items-center gap-2">
                   <span className={`text-[10px] font-bold tabular-nums ${STAGE_TEXT[stage.color]}`}>0{stage.id}</span>
-                  <span className="text-sm font-semibold text-slate-800">{stage.label}</span>
+                  <span className="text-sm font-semibold text-[#1d1d1f]">{stage.label}</span>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">{STAGE_SUBTITLES[stage.id]}</p>
+                <p className="text-[11px] text-[#707070] leading-relaxed">{STAGE_SUBTITLES[stage.id]}</p>
               </div>
             ))}
           </div>
@@ -181,15 +181,15 @@ export default function HomePage() {
 
         {/* Projects Grid */}
         {loading ? (
-          <div className="flex items-center justify-center py-24 text-slate-400">불러오는 중...</div>
+          <div className="flex items-center justify-center py-24 text-[#707070]">불러오는 중...</div>
         ) : projects.length === 0 ? (
           <div className="text-center py-24">
-            <div className="text-slate-300 text-5xl mb-4">◎</div>
-            <p className="text-slate-600 text-lg mb-2">아직 프로젝트가 없습니다</p>
-            <p className="text-slate-400 text-sm mb-6">새 UX 기획 프로젝트를 시작해보세요</p>
+            <div className="text-[#e8e8ed] text-5xl mb-4">◎</div>
+            <p className="text-[#1d1d1f] text-lg mb-2">아직 프로젝트가 없습니다</p>
+            <p className="text-[#707070] text-sm mb-6">새 UX 기획 프로젝트를 시작해보세요</p>
             <button
               onClick={() => setShowForm(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
+              className="bg-[#0071e3] hover:bg-[#0077ed] text-white text-[13px] font-normal px-5 py-2 rounded-full transition-colors"
             >
               첫 프로젝트 만들기
             </button>
@@ -204,14 +204,14 @@ export default function HomePage() {
                 <div
                   key={p.id}
                   onClick={() => handleCardClick(p.id)}
-                  className={`group relative bg-white border rounded-xl p-5 cursor-pointer hover:shadow-sm transition-all ${
-                    pinned ? "border-blue-200 ring-1 ring-blue-100" : "border-slate-200 hover:border-slate-300"
+                  className={`group relative bg-white rounded-[28px] p-7 cursor-pointer transition-all border ${
+                    pinned ? "border-[#0071e3]/20" : "border-[#e8e8ed] hover:border-[#d2d2d7]"
                   }`}
                 >
                   {/* Top row: stage badge + pin / delete */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-1.5">
-                      <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md ${STAGE_TEXT[stage.color]} bg-slate-100`}>
+                      <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-[10px] ${STAGE_TEXT[stage.color]} bg-[#f5f5f7]`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${STAGE_COLORS[stage.color]}`} />
                         {stage.label}
                       </div>
@@ -219,8 +219,8 @@ export default function HomePage() {
                         onClick={(e) => handlePin(p.id, e)}
                         className={`p-1 rounded transition-all ${
                           pinned
-                            ? "text-blue-500 opacity-100"
-                            : "text-slate-300 opacity-0 group-hover:opacity-100 hover:text-slate-600"
+                            ? "text-[#0071e3] opacity-100"
+                            : "text-[#d2d2d7] opacity-0 group-hover:opacity-100 hover:text-[#707070]"
                         }`}
                         title={pinned ? "핀 해제" : "핀 고정"}
                       >
@@ -229,18 +229,18 @@ export default function HomePage() {
                     </div>
                     <button
                       onClick={(e) => handleDelete(p.id, e)}
-                      className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all text-xs px-1"
+                      className="text-[#d2d2d7] hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all text-xs px-1"
                     >
                       삭제
                     </button>
                   </div>
 
-                  <h2 className="text-base font-semibold text-slate-900 mb-1">{p.name}</h2>
+                  <h2 className="text-base font-semibold text-[#1d1d1f] mb-1">{p.name}</h2>
                   {p.description && (
-                    <p className="text-sm text-slate-500 line-clamp-2 mb-3">{p.description}</p>
+                    <p className="text-sm text-[#707070] line-clamp-2 mb-3">{p.description}</p>
                   )}
                   {p.domain && (
-                    <p className="text-xs text-slate-400">도메인: {p.domain}</p>
+                    <p className="text-xs text-[#707070]">도메인: {p.domain}</p>
                   )}
 
                   <div className="mt-4 flex gap-1">
@@ -248,14 +248,14 @@ export default function HomePage() {
                       <div
                         key={s.id}
                         className={`h-1 flex-1 rounded-full transition-colors ${
-                          s.id <= p.current_stage ? STAGE_COLORS[s.color] : "bg-slate-200"
+                          s.id <= p.current_stage ? STAGE_COLORS[s.color] : "bg-[#e8e8ed]"
                         }`}
                       />
                     ))}
                   </div>
 
                   {accessed && (
-                    <p className="mt-2 text-xs text-slate-400">최근 접속: {fmtDateTime(accessed)}</p>
+                    <p className="mt-2 text-xs text-[#707070]">최근 접속: {fmtDateTime(accessed)}</p>
                   )}
                 </div>
               );
@@ -266,53 +266,53 @@ export default function HomePage() {
 
       {/* Create Project Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-md shadow-lg">
-            <h2 className="text-lg font-semibold text-slate-900 mb-5">새 프로젝트 만들기</h2>
+        <div className="fixed inset-0 bg-[#1d1d1f]/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-md">
+            <h2 className="text-lg font-semibold text-[#1d1d1f] mb-5">새 프로젝트 만들기</h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm text-slate-500 mb-1.5">프로젝트명 *</label>
+                <label className="block text-sm text-[#707070] mb-1.5">프로젝트명 *</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="예: 배달앱 UX 리디자인"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400"
+                  className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2.5 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1.5">도메인</label>
+                <label className="block text-sm text-[#707070] mb-1.5">도메인</label>
                 <input
                   type="text"
                   value={form.domain}
                   onChange={(e) => setForm({ ...form, domain: e.target.value })}
                   placeholder="예: 음식 배달, 헬스케어, 금융"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400"
+                  className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2.5 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1.5">설명</label>
+                <label className="block text-sm text-[#707070] mb-1.5">설명</label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder="프로젝트 배경 및 목표"
                   rows={3}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400 resize-none"
+                  className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2.5 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] resize-none transition-colors"
                 />
               </div>
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-lg transition-colors"
+                  className="flex-1 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] text-sm font-medium py-2.5 rounded-full transition-colors"
                 >
                   취소
                 </button>
                 <button
                   type="submit"
                   disabled={creating || !form.name.trim()}
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+                  className="flex-1 bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-full transition-colors"
                 >
                   {creating ? "생성 중..." : "시작하기"}
                 </button>

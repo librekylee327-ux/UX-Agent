@@ -39,23 +39,23 @@ const ICON_COLOR: Record<string, string> = {
 export default function WorkflowPipeline({ currentStage, onStageClick }: Props) {
   return (
     <div className="flex justify-center">
-      <div className="inline-flex items-center gap-0.5 bg-slate-100 border border-slate-200 rounded-full px-1.5 py-1.5">
+      <div className="inline-flex items-center gap-0.5 bg-[#f5f5f7] border border-[#e8e8ed] rounded-full px-1.5 py-1.5">
         {STAGES.map((stage) => {
           const isActive = stage.id === currentStage;
           return isActive ? (
             <div
               key={stage.id}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-white shadow-sm ${ICON_COLOR[stage.color]}`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-white ${ICON_COLOR[stage.color]}`}
             >
               {STAGE_ICONS[stage.id - 1]}
-              <span className="text-sm font-medium text-slate-800 whitespace-nowrap">{stage.label}</span>
+              <span className="text-sm font-medium text-[#1d1d1f] whitespace-nowrap">{stage.label}</span>
             </div>
           ) : (
             <button
               key={stage.id}
               onClick={() => onStageClick(stage.id)}
               title={stage.label}
-              className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/70 transition-colors flex-shrink-0"
+              className="p-2 rounded-full text-[#707070] hover:text-[#1d1d1f] hover:bg-[#e8e8ed]/70 transition-colors flex-shrink-0"
             >
               {STAGE_ICONS[stage.id - 1]}
             </button>

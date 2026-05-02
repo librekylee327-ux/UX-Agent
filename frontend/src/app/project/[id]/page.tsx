@@ -14,7 +14,6 @@ import SolutionStage from "@/components/stages/SolutionStage";
 
 const STAGE_COMPONENTS = [PurposeStage, ContextStage, PeopleStage, AbstractStage, SolutionStage];
 
-
 const STAGE_ICONS = [
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
     <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
@@ -82,19 +81,19 @@ export default function ProjectPage() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-[#F7F8FA] flex overflow-hidden">
-        <nav className="w-14 bg-white border-r border-slate-200 flex-shrink-0 h-screen" />
-        <div className="flex-1 flex items-center justify-center text-slate-400">로딩 중...</div>
+      <div className="h-screen bg-[#f5f5f7] flex overflow-hidden">
+        <nav className="w-14 bg-white border-r border-[#e8e8ed] flex-shrink-0 h-screen" />
+        <div className="flex-1 flex items-center justify-center text-[#707070]">로딩 중...</div>
       </div>
     );
   }
 
   if (!project) {
     return (
-      <div className="min-h-screen bg-[#F7F8FA] flex items-center justify-center">
+      <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-slate-500 mb-4">프로젝트를 찾을 수 없습니다</p>
-          <button onClick={() => router.push("/")} className="text-blue-500 hover:underline text-sm">← 돌아가기</button>
+          <p className="text-[#707070] mb-4">프로젝트를 찾을 수 없습니다</p>
+          <button onClick={() => router.push("/")} className="text-[#0066cc] hover:underline text-sm">← 돌아가기</button>
         </div>
       </div>
     );
@@ -104,20 +103,19 @@ export default function ProjectPage() {
   const stageInfo = STAGES.find((s) => s.id === activeStage)!;
 
   return (
-    <div className="h-screen bg-[#F7F8FA] flex overflow-hidden">
+    <div className="h-screen bg-[#f5f5f7] flex overflow-hidden">
       {/* Left nav */}
-      <nav className="w-14 bg-white border-r border-slate-200 flex flex-col items-center justify-between py-5 h-screen flex-shrink-0">
-        {/* Stage icons */}
+      <nav className="w-14 bg-white border-r border-[#e8e8ed] flex flex-col items-center justify-between py-5 h-screen flex-shrink-0">
         <div className="flex flex-col items-center gap-1">
           {STAGES.map((stage) => (
             <button
               key={stage.id}
               onClick={() => changeStage(stage.id)}
               title={stage.label}
-              className={`p-2.5 rounded-xl transition-colors ${
+              className={`p-2.5 rounded-[10px] transition-colors ${
                 activeStage === stage.id
                   ? ICON_ACTIVE[stage.color]
-                  : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                  : "text-[#707070] hover:text-[#1d1d1f] hover:bg-[#f5f5f7]"
               }`}
             >
               {STAGE_ICONS[stage.id - 1]}
@@ -125,11 +123,10 @@ export default function ProjectPage() {
           ))}
         </div>
 
-        {/* Exit icon */}
         <button
           onClick={() => router.push("/")}
           title="목록으로"
-          className="p-2.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+          className="p-2.5 rounded-[10px] text-[#707070] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -144,10 +141,10 @@ export default function ProjectPage() {
         {/* Stage header */}
         <div className="px-6 pt-5 pb-4 flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">
+            <h2 className="text-lg font-semibold text-[#1d1d1f] tracking-tight">
               {activeStage}. {stageInfo.label}
             </h2>
-            <p className="text-sm text-slate-500 mt-0.5">{stageInfo.desc}</p>
+            <p className="text-sm text-[#707070] mt-0.5">{stageInfo.desc}</p>
           </div>
           <div className="flex flex-col items-end gap-1 min-w-0">
             {editingName ? (
@@ -158,18 +155,18 @@ export default function ProjectPage() {
                 onBlur={saveName}
                 onKeyDown={(e) => e.key === "Enter" && saveName()}
                 autoFocus
-                className="bg-transparent text-base font-semibold text-slate-900 focus:outline-none border-b border-blue-400 pb-0.5 text-right"
+                className="bg-transparent text-base font-semibold text-[#1d1d1f] focus:outline-none border-b border-[#0071e3] pb-0.5 text-right"
               />
             ) : (
               <button
                 onClick={() => setEditingName(true)}
-                className="text-base font-semibold text-slate-400 hover:text-slate-600 truncate text-right"
+                className="text-base font-semibold text-[#707070] hover:text-[#1d1d1f] truncate text-right transition-colors"
               >
                 {project.name}
               </button>
             )}
             {project.domain && (
-              <p className="text-xs text-slate-400">{project.domain}</p>
+              <p className="text-xs text-[#707070]">{project.domain}</p>
             )}
           </div>
         </div>
@@ -177,7 +174,7 @@ export default function ProjectPage() {
         {/* Main grid */}
         <div className="flex-1 px-6 pb-6 grid grid-cols-[1fr_280px] gap-5 items-start">
           {/* Stage workspace */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 min-h-[500px]">
+          <div className="bg-white rounded-[28px] p-7 min-h-[500px]">
             {activeStage === 1 ? (
               <PurposeStage projectId={projectId} refreshKey={crawlerRefresh} key={`${projectId}-1`} />
             ) : (
@@ -195,33 +192,33 @@ export default function ProjectPage() {
 
             {/* 팩트 분류 기준 — Stage 1 전용 */}
             {activeStage === 1 && (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 pt-4 pb-3">팩트 분류 기준</p>
+              <div className="bg-white rounded-[28px] overflow-hidden">
+                <p className="text-xs font-semibold text-[#707070] uppercase tracking-wider px-5 pt-5 pb-3">팩트 분류 기준</p>
 
                 {/* 인사이트 등급 */}
                 {(() => {
                   const key = "grade";
                   const open = openGuides.has(key);
                   return (
-                    <div className="border-t border-slate-100">
+                    <div className="border-t border-[#f5f5f7]">
                       <button
                         onClick={() => setOpenGuides((prev) => { const n = new Set(prev); open ? n.delete(key) : n.add(key); return n; })}
-                        className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+                        className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
                       >
                         <span className="font-medium">인사이트 등급</span>
-                        <span className="text-slate-300 text-[10px]">{open ? "▲" : "▼"}</span>
+                        <span className="text-[#d2d2d7] text-[10px]">{open ? "▲" : "▼"}</span>
                       </button>
                       {open && (
-                        <div className="px-4 pb-3 space-y-1.5">
+                        <div className="px-5 pb-3 space-y-1.5">
                           {[
                             { grade: "S", color: "text-amber-700 bg-amber-50 border-amber-200", desc: "5개 Why 레이어 모두 도출" },
                             { grade: "A", color: "text-blue-700 bg-blue-50 border-blue-200", desc: "3개 이상 레이어 도출" },
-                            { grade: "B", color: "text-slate-600 bg-slate-100 border-slate-200", desc: "추가 맥락이 필요한 후보" },
-                            { grade: "C", color: "text-slate-400 bg-slate-50 border-slate-200", desc: "맥락은 있으나 구조 추론 어려움" },
+                            { grade: "B", color: "text-[#474747] bg-[#f5f5f7] border-[#e8e8ed]", desc: "추가 맥락이 필요한 후보" },
+                            { grade: "C", color: "text-[#707070] bg-[#f5f5f7] border-[#e8e8ed]", desc: "맥락은 있으나 구조 추론 어려움" },
                           ].map(({ grade, color, desc }) => (
                             <div key={grade} className="flex items-center gap-2">
                               <span className={`text-xs font-bold px-1.5 py-0.5 rounded border flex-shrink-0 w-6 text-center ${color}`}>{grade}</span>
-                              <p className="text-xs text-slate-500">{desc}</p>
+                              <p className="text-xs text-[#707070]">{desc}</p>
                             </div>
                           ))}
                         </div>
@@ -235,16 +232,16 @@ export default function ProjectPage() {
                   const key = "type";
                   const open = openGuides.has(key);
                   return (
-                    <div className="border-t border-slate-100">
+                    <div className="border-t border-[#f5f5f7]">
                       <button
                         onClick={() => setOpenGuides((prev) => { const n = new Set(prev); open ? n.delete(key) : n.add(key); return n; })}
-                        className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+                        className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
                       >
                         <span className="font-medium">팩트 유형</span>
-                        <span className="text-slate-300 text-[10px]">{open ? "▲" : "▼"}</span>
+                        <span className="text-[#d2d2d7] text-[10px]">{open ? "▲" : "▼"}</span>
                       </button>
                       {open && (
-                        <div className="px-4 pb-3 space-y-2">
+                        <div className="px-5 pb-3 space-y-2">
                           {[
                             { type: "A", label: "행동 비관행", color: "text-purple-700 bg-purple-50 border-purple-200", desc: "일반 패턴에서 벗어난 서비스/사용자 행동" },
                             { type: "B", label: "구조 변화", color: "text-emerald-700 bg-emerald-50 border-emerald-200", desc: "시장·산업·서비스 구조 변화 신호" },
@@ -256,7 +253,7 @@ export default function ProjectPage() {
                                 <span className={`text-xs font-bold px-1 py-0.5 rounded border block leading-tight ${color}`}>TYPE {type}</span>
                                 <span className={`text-xs mt-0.5 block ${color} opacity-80`}>{label}</span>
                               </div>
-                              <p className="text-xs text-slate-500 leading-snug mt-0.5">{desc}</p>
+                              <p className="text-xs text-[#707070] leading-snug mt-0.5">{desc}</p>
                             </div>
                           ))}
                         </div>
@@ -270,30 +267,30 @@ export default function ProjectPage() {
                   const key = "gate";
                   const open = openGuides.has(key);
                   return (
-                    <div className="border-t border-slate-100">
+                    <div className="border-t border-[#f5f5f7]">
                       <button
                         onClick={() => setOpenGuides((prev) => { const n = new Set(prev); open ? n.delete(key) : n.add(key); return n; })}
-                        className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+                        className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
                       >
                         <span className="font-medium">3-Gate 판정</span>
-                        <span className="text-slate-300 text-[10px]">{open ? "▲" : "▼"}</span>
+                        <span className="text-[#d2d2d7] text-[10px]">{open ? "▲" : "▼"}</span>
                       </button>
                       {open && (
-                        <div className="px-4 pb-3 space-y-1.5">
+                        <div className="px-5 pb-4 space-y-1.5">
                           {[
                             { gate: "Gate 1", desc: "도메인 맥락 가치" },
                             { gate: "Gate 2", desc: "차별성" },
                             { gate: "Gate 3", desc: "구조적 인과성" },
                           ].map(({ gate, desc }) => (
                             <div key={gate} className="flex items-center gap-2">
-                              <span className="text-xs text-slate-400 flex-shrink-0 w-14">{gate}</span>
-                              <p className="text-xs text-slate-500">{desc}</p>
+                              <span className="text-xs text-[#707070] flex-shrink-0 w-14">{gate}</span>
+                              <p className="text-xs text-[#707070]">{desc}</p>
                             </div>
                           ))}
-                          <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                          <p className="text-xs text-[#707070] mt-1 leading-relaxed">
                             1+2+3 → <span className="text-amber-600">S/A</span> &nbsp;
-                            2+3 → <span className="text-slate-500">B</span> &nbsp;
-                            1 → <span className="text-slate-400">C</span> &nbsp;
+                            2+3 → <span className="text-[#474747]">B</span> &nbsp;
+                            1 → <span className="text-[#707070]">C</span> &nbsp;
                             미통과 → 노이즈
                           </p>
                         </div>

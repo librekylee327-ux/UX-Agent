@@ -66,27 +66,27 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
   ];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <div className="bg-white rounded-[28px] overflow-hidden">
       {/* Header */}
-      <div className="px-4 pt-4 pb-0">
+      <div className="px-5 pt-5 pb-0">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-sm font-semibold text-slate-800">크롤러</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{hint}</p>
+            <h3 className="text-sm font-semibold text-[#1d1d1f]">크롤러</h3>
+            <p className="text-xs text-[#707070] mt-0.5">{hint}</p>
           </div>
-          <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Stage {stage}</span>
+          <span className="text-xs text-[#707070] bg-[#f5f5f7] px-2 py-0.5 rounded-[10px]">Stage {stage}</span>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-slate-200">
+        <div className="flex gap-1 border-b border-[#e8e8ed]">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`text-xs px-3 py-2 transition-colors border-b-2 -mb-px ${
                 tab === t.id
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-slate-400 hover:text-slate-600"
+                  ? "border-[#0071e3] text-[#0071e3]"
+                  : "border-transparent text-[#707070] hover:text-[#1d1d1f]"
               }`}
             >
               {t.label}
@@ -96,14 +96,14 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSearch} className="p-4 space-y-3">
+      <form onSubmit={handleSearch} className="p-5 space-y-3">
         {tab !== "url" ? (
           <input
             type="text"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder={tab === "news" ? "키워드 입력 (예: 배달앱 트렌드)" : "검색어 입력"}
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400"
+            className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
           />
         ) : (
           <input
@@ -111,13 +111,13 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://..."
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400"
+            className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
           />
         )}
         <button
           type="submit"
           disabled={loading || (tab !== "url" ? !keyword.trim() : !url.trim())}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+          className="w-full bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-40 text-white text-sm font-normal py-2 rounded-full transition-colors"
         >
           {loading ? "수집 중..." : "수집 시작"}
         </button>
@@ -125,14 +125,14 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
 
       {/* Error */}
       {error && (
-        <div className="mx-4 mb-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-600">
+        <div className="mx-5 mb-4 p-2.5 bg-rose-50 border border-rose-200 rounded-[10px] text-xs text-rose-600">
           {error}
         </div>
       )}
 
       {/* Results */}
       {results.length > 0 && (
-        <div className="px-4 pb-3">
+        <div className="px-5 pb-4">
           <p className="text-xs text-emerald-600">{results.length}개 저장됨 ✓</p>
         </div>
       )}
