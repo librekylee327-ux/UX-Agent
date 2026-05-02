@@ -175,19 +175,21 @@ export default function AbstractStage({ projectId }: Props) {
       </div>
 
       {/* Collected refs */}
-      {refs.length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-slate-700 mb-2">수집된 리서치 자료 ({refs.length})</h3>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {refs.map((r) => (
-              <div key={r.id} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                <p className="text-slate-700 font-medium">{r.title}</p>
-                {r.content && <p className="text-slate-400 mt-1 line-clamp-2">{r.content}</p>}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <section>
+        <h3 className="text-sm font-semibold text-slate-700 mb-2">수집된 리서치 자료 {refs.length > 0 && `(${refs.length})`}</h3>
+        <div className="min-h-[160px] max-h-40 overflow-y-auto space-y-2">
+          {refs.length > 0 ? refs.map((r) => (
+            <div key={r.id} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+              <p className="text-slate-700 font-medium">{r.title}</p>
+              {r.content && <p className="text-slate-400 mt-1 line-clamp-2">{r.content}</p>}
+            </div>
+          )) : (
+            <div className="flex items-center justify-center h-full min-h-[160px]">
+              <p className="text-xs text-slate-400">레퍼런스를 수집하면 여기에 표시됩니다.</p>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

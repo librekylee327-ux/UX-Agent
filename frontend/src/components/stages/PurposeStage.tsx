@@ -341,19 +341,19 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             {(() => {
               const PAGE_SIZE = 4;
               const list = refTab === "all" ? refs : refTab === "pending" ? pendingRefs : analyzedRefs;
-              const totalPages = Math.ceil(list.length / PAGE_SIZE);
+              const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
               const paged = list.slice(refPage * PAGE_SIZE, refPage * PAGE_SIZE + PAGE_SIZE);
-
-              if (list.length === 0) return (
-                <p className="text-xs text-slate-400 px-1">
-                  {refTab === "pending" ? "분석 전 레퍼런스가 없습니다" : "분석 완료된 레퍼런스가 없습니다"}
-                </p>
-              );
 
               return (
                 <>
                   <div className="grid grid-cols-4 gap-2">
-                    {paged.map((r) => (
+                    {list.length === 0 ? (
+                      <div className="col-span-4 flex items-center justify-center h-28 rounded-lg border border-dashed border-slate-200 bg-slate-50">
+                        <p className="text-xs text-slate-400">
+                          {refTab === "pending" ? "분석 전 레퍼런스가 없습니다" : "분석 완료된 레퍼런스가 없습니다"}
+                        </p>
+                      </div>
+                    ) : paged.map((r) => (
                       <div
                         key={r.id}
                         onClick={() => !r.analyzed && setActiveRefId(activeRefId === r.id ? null : r.id)}
