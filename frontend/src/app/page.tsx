@@ -22,6 +22,45 @@ const STAGE_TEXT: Record<string, string> = {
   rose: "text-rose-600",
 };
 
+const STAGE_SUBTITLES: Record<number, string> = {
+  1: "버즈리포트 수집 → 유의미한 팩트 추출 → 5 Whys 역추론 → 보편 원리 도출 → 기회 파악",
+  2: "MECE 원칙 기반 도메인 프레임워크 설계 — 차원 · 세부 차원 · 요소로 구조화",
+  3: "전 · 중 · 후 단위로 물리적 · 사고적 행위 시퀀스 매핑, 외부 요소 포괄",
+  4: "휴리스틱 가설 수립 → 인터뷰 · 쉐도잉 Raw data 수집 → 본질 추론 → 컨셉 구상",
+  5: "플로우 설계 · 인터페이스 터치포인트 · 리텐션 핸들링 · 가치 제공 전방위 딜리버리",
+};
+
+const LS_PINNED = "uxer_pinned_projects";
+const LS_ACCESSED = "uxer_last_accessed";
+
+function loadPinned(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(LS_PINNED) ?? "[]")); }
+  catch { return new Set(); }
+}
+
+function loadAccessed(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(LS_ACCESSED) ?? "{}"); }
+  catch { return {}; }
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" });
+}
+
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString("ko-KR", {
+    month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true,
+  });
+}
+
+function PinIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+    </svg>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -29,8 +68,14 @@ export default function HomePage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", domain: "" });
   const [showForm, setShowForm] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
+  const [lastAccessed, setLastAccessed] = useState<Record<string, string>>({});
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    setPinnedIds(loadPinned());
+    setLastAccessed(loadAccessed());
+    load();
+  }, []);
 
   async function load() {
     try {
@@ -47,6 +92,7 @@ export default function HomePage() {
     setCreating(true);
     try {
       const p = await api.projects.create(form) as Project;
+      recordAccess(p.id);
       router.push(`/project/${p.id}`);
     } finally {
       setCreating(false);
@@ -60,6 +106,39 @@ export default function HomePage() {
     setProjects((prev) => prev.filter((p) => p.id !== id));
   }
 
+  function handlePin(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setPinnedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      localStorage.setItem(LS_PINNED, JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  function recordAccess(id: string) {
+    const now = new Date().toISOString();
+    setLastAccessed((prev) => {
+      const next = { ...prev, [id]: now };
+      localStorage.setItem(LS_ACCESSED, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function handleCardClick(id: string) {
+    recordAccess(id);
+    router.push(`/project/${id}`);
+  }
+
+  const sorted = [...projects].sort((a, b) => {
+    const pa = pinnedIds.has(a.id) ? 1 : 0;
+    const pb = pinnedIds.has(b.id) ? 1 : 0;
+    if (pa !== pb) return pb - pa;
+    const ta = lastAccessed[a.id] ?? a.updated_at ?? "";
+    const tb = lastAccessed[b.id] ?? b.updated_at ?? "";
+    return tb.localeCompare(ta);
+  });
+
   const stageInfo = (n: number) => STAGES.find((s) => s.id === n) ?? STAGES[0];
 
   return (
@@ -68,7 +147,7 @@ export default function HomePage() {
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-slate-900">UX 기획 플래너</h1>
+            <h1 className="text-xl font-bold text-slate-900">UXER Kyle's Design Workflow Agent</h1>
             <p className="text-xs text-slate-400 mt-0.5">목적 탐지 → 맥락 파악 → 사람 이해 → 추상 진입 → 솔루션 도출</p>
           </div>
           <button
@@ -82,18 +161,19 @@ export default function HomePage() {
 
       <main className="max-w-6xl mx-auto px-6 py-10">
         {/* Workflow Overview */}
-        <div className="mb-10 p-5 bg-white border border-slate-200 rounded-xl">
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-3">워크플로우</p>
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="mb-10 bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100">
+            <p className="text-xs text-slate-400 uppercase tracking-wider">워크플로우</p>
+          </div>
+          <div className="grid grid-cols-5 divide-x divide-slate-100">
             {STAGES.map((stage, i) => (
-              <div key={stage.id} className="flex items-center gap-2">
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                  <span className={`w-2 h-2 rounded-full ${STAGE_COLORS[stage.color]}`} />
-                  <span className="text-sm text-slate-700">{stage.label}</span>
+              <div key={stage.id} className="relative flex flex-col gap-2 px-4 py-4">
+                <div className={`absolute top-0 left-0 right-0 h-0.5 ${STAGE_COLORS[stage.color]}`} />
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold tabular-nums ${STAGE_TEXT[stage.color]}`}>0{stage.id}</span>
+                  <span className="text-sm font-semibold text-slate-800">{stage.label}</span>
                 </div>
-                {i < STAGES.length - 1 && (
-                  <span className="text-slate-300 text-xs">→</span>
-                )}
+                <p className="text-[11px] text-slate-400 leading-relaxed">{STAGE_SUBTITLES[stage.id]}</p>
               </div>
             ))}
           </div>
@@ -116,17 +196,43 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((p) => {
+            {sorted.map((p) => {
               const stage = stageInfo(p.current_stage);
+              const pinned = pinnedIds.has(p.id);
+              const accessed = lastAccessed[p.id];
               return (
                 <div
                   key={p.id}
-                  onClick={() => router.push(`/project/${p.id}`)}
-                  className="group relative bg-white border border-slate-200 rounded-xl p-5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all"
+                  onClick={() => handleCardClick(p.id)}
+                  className={`group relative bg-white border rounded-xl p-5 cursor-pointer hover:shadow-sm transition-all ${
+                    pinned ? "border-blue-200 ring-1 ring-blue-100" : "border-slate-200 hover:border-slate-300"
+                  }`}
                 >
-                  <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md mb-3 ${STAGE_TEXT[stage.color]} bg-slate-100`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${STAGE_COLORS[stage.color]}`} />
-                    {stage.label}
+                  {/* Top row: stage badge + pin / delete */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md ${STAGE_TEXT[stage.color]} bg-slate-100`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${STAGE_COLORS[stage.color]}`} />
+                        {stage.label}
+                      </div>
+                      <button
+                        onClick={(e) => handlePin(p.id, e)}
+                        className={`p-1 rounded transition-all ${
+                          pinned
+                            ? "text-blue-500 opacity-100"
+                            : "text-slate-300 opacity-0 group-hover:opacity-100 hover:text-slate-600"
+                        }`}
+                        title={pinned ? "핀 해제" : "핀 고정"}
+                      >
+                        <PinIcon filled={pinned} />
+                      </button>
+                    </div>
+                    <button
+                      onClick={(e) => handleDelete(p.id, e)}
+                      className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all text-xs px-1"
+                    >
+                      삭제
+                    </button>
                   </div>
 
                   <h2 className="text-base font-semibold text-slate-900 mb-1">{p.name}</h2>
@@ -147,16 +253,10 @@ export default function HomePage() {
                       />
                     ))}
                   </div>
-                  <p className="text-xs text-slate-400 mt-2">
-                    {p.updated_at ? new Date(p.updated_at).toLocaleDateString("ko-KR") : ""}
-                  </p>
 
-                  <button
-                    onClick={(e) => handleDelete(p.id, e)}
-                    className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all text-xs"
-                  >
-                    삭제
-                  </button>
+                  {accessed && (
+                    <p className="mt-2 text-xs text-slate-400">최근 접속: {fmtDateTime(accessed)}</p>
+                  )}
                 </div>
               );
             })}

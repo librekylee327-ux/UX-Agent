@@ -82,8 +82,9 @@ export default function ProjectPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F8FA] flex items-center justify-center text-slate-400">
-        로딩 중...
+      <div className="h-screen bg-[#F7F8FA] flex overflow-hidden">
+        <nav className="w-14 bg-white border-r border-slate-200 flex-shrink-0 h-screen" />
+        <div className="flex-1 flex items-center justify-center text-slate-400">로딩 중...</div>
       </div>
     );
   }
@@ -103,9 +104,9 @@ export default function ProjectPage() {
   const stageInfo = STAGES.find((s) => s.id === activeStage)!;
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA] flex">
+    <div className="h-screen bg-[#F7F8FA] flex overflow-hidden">
       {/* Left nav */}
-      <nav className="w-14 bg-white border-r border-slate-200 flex flex-col items-center justify-between py-5 sticky top-0 h-screen flex-shrink-0">
+      <nav className="w-14 bg-white border-r border-slate-200 flex flex-col items-center justify-between py-5 h-screen flex-shrink-0">
         {/* Stage icons */}
         <div className="flex flex-col items-center gap-1">
           {STAGES.map((stage) => (
@@ -139,7 +140,7 @@ export default function ProjectPage() {
       </nav>
 
       {/* Content */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto [scrollbar-gutter:stable]">
         {/* Stage header */}
         <div className="px-6 pt-5 pb-4 flex items-center justify-between gap-4">
           <div>
