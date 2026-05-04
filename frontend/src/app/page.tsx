@@ -43,20 +43,25 @@ function loadAccessed(): Record<string, string> {
   catch { return {}; }
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" });
-}
-
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString("ko-KR", {
     month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true,
   });
 }
 
-function PinIcon({ filled }: { filled: boolean }) {
+function StarIcon({ filled }: { filled: boolean }) {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   );
 }
@@ -70,6 +75,7 @@ export default function HomePage() {
   const [showForm, setShowForm] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [lastAccessed, setLastAccessed] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     setPinnedIds(loadPinned());
@@ -130,52 +136,72 @@ export default function HomePage() {
     router.push(`/project/${id}`);
   }
 
-  const sorted = [...projects].sort((a, b) => {
-    const pa = pinnedIds.has(a.id) ? 1 : 0;
-    const pb = pinnedIds.has(b.id) ? 1 : 0;
-    if (pa !== pb) return pb - pa;
-    const ta = lastAccessed[a.id] ?? a.updated_at ?? "";
-    const tb = lastAccessed[b.id] ?? b.updated_at ?? "";
-    return tb.localeCompare(ta);
-  });
+  const sorted = [...projects]
+    .filter((p) =>
+      search.trim() === "" ||
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.domain ?? "").toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const pa = pinnedIds.has(a.id) ? 1 : 0;
+      const pb = pinnedIds.has(b.id) ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      const ta = lastAccessed[a.id] ?? a.updated_at ?? "";
+      const tb = lastAccessed[b.id] ?? b.updated_at ?? "";
+      return tb.localeCompare(ta);
+    });
 
   const stageInfo = (n: number) => STAGES.find((s) => s.id === n) ?? STAGES[0];
 
   return (
     <div className="min-h-screen bg-[#f5f5f7]">
       {/* Header */}
-      <header className="border-b border-[#e8e8ed] bg-white/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-[1200px] mx-auto px-6 h-11 flex items-center justify-between">
-          <div>
-            <h1 className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight">UXER Kyle's Design Workflow Agent</h1>
-            <p className="text-[11px] text-[#707070] mt-0.5">목적 탐지 → 맥락 파악 → 사람 이해 → 추상 진입 → 솔루션 도출</p>
-          </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-[#0071e3] hover:bg-[#0077ed] text-white text-[13px] font-normal px-4 py-1.5 rounded-full transition-colors"
-          >
-            + 새 프로젝트
-          </button>
+      <header className="bg-white border-b border-[#e8e8ed]">
+        <div className="max-w-[1200px] mx-auto px-6 py-4">
+          <p className="text-[11px] text-[#a0a0a5] mb-0.5">Agentic Service</p>
+          <h1 className="text-[17px] font-semibold text-[#1d1d1f]">UXER Kyle's Design Workflow Agent</h1>
         </div>
       </header>
 
-      <main className="max-w-[1200px] mx-auto px-6 py-10">
-        {/* Workflow Overview */}
-        <div className="mb-10 bg-white rounded-[28px] overflow-hidden">
-          <div className="px-5 py-3 border-b border-[#f5f5f7]">
-            <p className="text-[11px] text-[#707070] uppercase tracking-wider">워크플로우</p>
-          </div>
-          <div className="grid grid-cols-5 divide-x divide-[#e8e8ed]">
+      {/* Workflow Card — full width, dark */}
+      <div className="max-w-[1200px] mx-auto px-6 pt-8 pb-8">
+        <div className="bg-[#1d2433] rounded-2xl overflow-hidden">
+          <div className="grid grid-cols-5 divide-x divide-white/10">
             {STAGES.map((stage) => (
-              <div key={stage.id} className="relative flex flex-col gap-2 px-4 py-4">
+              <div key={stage.id} className="relative px-5 py-5">
                 <div className={`absolute top-0 left-0 right-0 h-0.5 ${STAGE_COLORS[stage.color]}`} />
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-bold tabular-nums ${STAGE_TEXT[stage.color]}`}>0{stage.id}</span>
-                  <span className="text-sm font-semibold text-[#1d1d1f]">{stage.label}</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-[11px] font-bold tabular-nums ${STAGE_TEXT[stage.color]}`}>0{stage.id}</span>
+                  <span className="text-[13px] font-semibold text-white">{stage.label}</span>
                 </div>
-                <p className="text-[11px] text-[#707070] leading-relaxed">{STAGE_SUBTITLES[stage.id]}</p>
+                <p className="text-[11px] text-white/45 leading-relaxed">{STAGE_SUBTITLES[stage.id]}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      <main className="max-w-[1200px] mx-auto px-6 pb-10">
+        {/* Section Bar */}
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[15px] font-semibold text-[#1d1d1f]">My Project</h2>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-white border border-[#e8e8ed] rounded-full px-3 py-1.5 text-[#a0a0a5]">
+              <SearchIcon />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search"
+                className="text-[13px] text-[#1d1d1f] placeholder-[#a0a0a5] bg-transparent outline-none w-36"
+              />
+            </div>
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-[#0071e3] hover:bg-[#0077ed] text-white text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors whitespace-nowrap"
+            >
+              + 새 프로젝트
+            </button>
           </div>
         </div>
 
@@ -194,8 +220,10 @@ export default function HomePage() {
               첫 프로젝트 만들기
             </button>
           </div>
+        ) : sorted.length === 0 ? (
+          <div className="text-center py-16 text-[#707070] text-sm">검색 결과가 없습니다</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {sorted.map((p) => {
               const stage = stageInfo(p.current_stage);
               const pinned = pinnedIds.has(p.id);
@@ -204,14 +232,14 @@ export default function HomePage() {
                 <div
                   key={p.id}
                   onClick={() => handleCardClick(p.id)}
-                  className={`group relative bg-white rounded-[28px] p-7 cursor-pointer transition-all border ${
+                  className={`group relative bg-white rounded-2xl p-5 cursor-pointer transition-all border hover:shadow-md ${
                     pinned ? "border-[#0071e3]/20" : "border-[#e8e8ed] hover:border-[#d2d2d7]"
                   }`}
                 >
-                  {/* Top row: stage badge + pin / delete */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-[10px] ${STAGE_TEXT[stage.color]} bg-[#f5f5f7]`}>
+                  {/* Top row */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${STAGE_TEXT[stage.color]} bg-[#f5f5f7]`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${STAGE_COLORS[stage.color]}`} />
                         {stage.label}
                       </div>
@@ -219,31 +247,29 @@ export default function HomePage() {
                         onClick={(e) => handlePin(p.id, e)}
                         className={`p-1 rounded transition-all ${
                           pinned
-                            ? "text-[#0071e3] opacity-100"
-                            : "text-[#d2d2d7] opacity-0 group-hover:opacity-100 hover:text-[#707070]"
+                            ? "text-amber-400 opacity-100"
+                            : "text-[#c7c7cc] opacity-0 group-hover:opacity-100 hover:text-amber-400"
                         }`}
                         title={pinned ? "핀 해제" : "핀 고정"}
                       >
-                        <PinIcon filled={pinned} />
+                        <StarIcon filled={pinned} />
                       </button>
                     </div>
                     <button
                       onClick={(e) => handleDelete(p.id, e)}
-                      className="text-[#d2d2d7] hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all text-xs px-1"
+                      className="text-[#d2d2d7] hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all text-xs px-1 leading-none"
                     >
-                      삭제
+                      ✕
                     </button>
                   </div>
 
-                  <h2 className="text-base font-semibold text-[#1d1d1f] mb-1">{p.name}</h2>
+                  <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-1 leading-snug">{p.name}</h2>
                   {p.description && (
-                    <p className="text-sm text-[#707070] line-clamp-2 mb-3">{p.description}</p>
-                  )}
-                  {p.domain && (
-                    <p className="text-xs text-[#707070]">도메인: {p.domain}</p>
+                    <p className="text-xs text-[#707070] line-clamp-2 mb-2">{p.description}</p>
                   )}
 
-                  <div className="mt-4 flex gap-1">
+                  {/* Progress bars */}
+                  <div className="flex gap-1 my-3">
                     {STAGES.map((s) => (
                       <div
                         key={s.id}
@@ -255,7 +281,7 @@ export default function HomePage() {
                   </div>
 
                   {accessed && (
-                    <p className="mt-2 text-xs text-[#707070]">최근 접속: {fmtDateTime(accessed)}</p>
+                    <p className="text-[11px] text-[#a0a0a5]">최근 접속일: {fmtDateTime(accessed)}</p>
                   )}
                 </div>
               );
@@ -267,7 +293,7 @@ export default function HomePage() {
       {/* Create Project Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-[#1d1d1f]/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[28px] p-7 w-full max-w-md">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-md shadow-xl">
             <h2 className="text-lg font-semibold text-[#1d1d1f] mb-5">새 프로젝트 만들기</h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
