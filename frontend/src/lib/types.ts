@@ -28,6 +28,11 @@ export interface Fact {
   created_at: string;
 }
 
+export interface WhyChainStep {
+  q: string;
+  a: string;
+}
+
 export interface FiveWhys {
   id: string;
   project_id: string;
@@ -38,6 +43,8 @@ export interface FiveWhys {
   why3: string;
   why4: string;
   why5: string;
+  chain_json: string | null;  // JSON: WhyChainStep[]
+  insight: string;
   principle: string;
   created_at: string;
 }

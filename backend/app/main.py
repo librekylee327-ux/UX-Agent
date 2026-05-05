@@ -22,6 +22,23 @@ app.include_router(analyze.router)
 @app.on_event("startup")
 def startup():
     init_db()
+    _migrate_db()
+
+
+def _migrate_db():
+    from app.database import engine
+    from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE five_whys ADD COLUMN chain_json TEXT",
+        "ALTER TABLE five_whys ADD COLUMN insight TEXT DEFAULT ''",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # column already exists
 
 
 @app.get("/api/health")

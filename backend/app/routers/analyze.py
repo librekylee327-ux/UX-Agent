@@ -43,6 +43,12 @@ def _ref_block(refs: list) -> str:
 def build_extraction_prompt(refs: list) -> str:
     return f"""당신은 UX 기획 분석가입니다. 레퍼런스에서 UX 기획에 유의미한 팩트를 추출하세요.
 
+먼저 레퍼런스 전체 내용을 1~2문장으로 요약하고, 이후 팩트를 추출하세요.
+
+[SUMMARY]
+이 레퍼런스의 핵심 내용 요약 (1~2문장)
+[/SUMMARY]
+
 3-Gate 판정:
 - Gate1(도메인 맥락): 특정 서비스/산업의 실제 현상인가?
 - Gate2(차별성): 비관행적이거나 예상치 못한 패턴인가?
@@ -66,24 +72,35 @@ def build_extraction_prompt(refs: list) -> str:
 {_ref_block(refs)}"""
 
 
-# ── Stage 2: 5Why 추론 전용 프롬프트 (품질 모델, 팩트 1개씩) ────────────────
+def parse_ref_summary(text: str) -> str:
+    m = re.search(r"\[SUMMARY\](.*?)(?:\[/SUMMARY\]|(?=\[FACT\]))", text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    return ""
+
+
+# ── Stage 2: 5Why 순차 체인 추론 프롬프트 ────────────────────────────────────
 def build_why_prompt(fact: str, service: str) -> str:
     service_part = f"서비스: {service}\n" if service else ""
-    return f"""UX 기획 분석가다. 아래 팩트의 구조적 맥락과 차별성을 5가지 시각으로 역추론하라.
+    return f"""UX 기획 분석가다. 아래 팩트의 본질적 원인을 "왜?" 5번 체인으로 역추론하라.
 
 {service_part}팩트: {fact}
 
-각 항목에 팩트에 최적화된 구체적 통찰·판단을 1~2문장으로 작성하라.
-질문 형식 금지. [WHY] 블록만 출력. 마크다운 금지.
+각 A(답변)이 다음 Q(질문)의 출발점. A5에서 더이상 내려갈 수 없는 본질에 도달한다.
+마크다운 금지. Q1~Q5, A1~A5, 핵심인사이트, 인사이트등급을 아래 형식 그대로 출력하라.
 
-[WHY]
-Why1(서비스):
-Why2(산업):
-Why3(사용자):
-Why4(구조):
-Why5(확장):
-인사이트등급:
-[/WHY]"""
+Q1: 왜 이런 현상이 나타나는가?
+A1:
+Q2:
+A2:
+Q3:
+A3:
+Q4:
+A4:
+Q5:
+A5:
+핵심인사이트:
+인사이트등급:"""
 
 
 # ── Legacy: 비스트리밍 /facts 엔드포인트용 통합 프롬프트 ────────────────────
@@ -208,39 +225,56 @@ def parse_extracted_facts(text: str) -> list[dict]:
     return facts
 
 
-def _clean_why_value(v: str) -> str:
-    """Why 필드 값에서 파싱 잔재 제거"""
-    v = re.sub(r'\[인사이트등급\s*:\s*[SABC]\]', '', v)  # 임베드된 등급 태그 제거
-    v = re.sub(r'^<|>$', '', v.strip())                   # 앞뒤 꺾쇠 제거
-    v = re.sub(r'\[/?WHY\]', '', v)                       # 잔여 태그 제거
+_BOUNDARY = r'(?=Q\d\s*:|A\d\s*:|핵심인사이트\s*:|인사이트등급\s*:|\Z)'
+
+
+def _clean_val(v: str) -> str:
+    v = v.strip()
+    v = re.sub(r'\*\*', '', v)         # 마크다운 볼드 제거
+    v = re.sub(r'^<|>$', '', v)        # 앞뒤 꺾쇠 제거
+    v = re.sub(r'^\[.*?\]$', '', v)    # [placeholder] 제거
+    v = re.sub(r'\[/?CHAIN\]', '', v)
     return v.strip()
 
 
 def parse_whys(text: str) -> dict:
-    """Stage 2 출력 파싱 — [WHY]...[/WHY] 또는 닫힘 태그 없음, 복수 블록 모두 허용"""
-    field_keys = ["Why1(서비스)", "Why2(산업)", "Why3(사용자)", "Why4(구조)", "Why5(확장)", "인사이트등급"]
-    merged: dict = {}
-    parts = re.split(r"\[WHY\]", text)
-    for part in parts[1:]:
-        chunk = re.split(r"\[/WHY\]|\[WHY\]", part)[0]
-        data = _parse_block(chunk.strip(), field_keys)
-        for k, v in data.items():
-            cleaned = _clean_why_value(v)
-            if cleaned and k not in merged:
-                merged[k] = cleaned
+    """Stage 2 출력 파싱 — regex 기반, 포맷 내성 강화"""
+    # [CHAIN] 태그 있으면 내부만 사용, 없으면 전체 텍스트
+    cm = re.search(r'\[CHAIN\](.*?)(?:\[/CHAIN\]|\Z)', text, re.DOTALL)
+    body = cm.group(1) if cm else text
 
-    whys = {wk: merged[wk] for wk in field_keys[:-1] if merged.get(wk, "").strip()}
+    # Q1~Q5, A1~A5를 경계 lookahead로 추출
+    qs: dict[int, str] = {}
+    as_: dict[int, str] = {}
+    for m in re.finditer(r'Q(\d)\s*:\s*(.*?)' + _BOUNDARY, body, re.DOTALL):
+        idx = int(m.group(1))
+        val = _clean_val(m.group(2))
+        if val and idx not in qs:
+            qs[idx] = val
+    for m in re.finditer(r'A(\d)\s*:\s*(.*?)' + _BOUNDARY, body, re.DOTALL):
+        idx = int(m.group(1))
+        val = _clean_val(m.group(2))
+        if val and idx not in as_:
+            as_[idx] = val
 
-    # 인사이트등급: 필드로 못 잡히면 텍스트에서 직접 추출
-    insight_grade = merged.get("인사이트등급", "").strip()
-    if not insight_grade:
-        m = re.search(r'\[인사이트등급\s*:\s*([SABC])\]', text)
-        if m:
-            insight_grade = m.group(1)
-    # S/A/B/C 한 글자만 남기기
-    insight_grade = re.sub(r'[^SABC]', '', insight_grade.upper())[:1]
+    chain = []
+    for i in range(1, 6):
+        q = qs.get(i, "")
+        a = as_.get(i, "")
+        if q or a:
+            chain.append({"q": q, "a": a})
 
-    return {"whys": whys, "insight_grade": insight_grade}
+    # 핵심인사이트
+    im = re.search(r'핵심인사이트\s*:\s*(.*?)(?=인사이트등급\s*:|\Z)', body, re.DOTALL)
+    insight = _clean_val(im.group(1)) if im else ""
+
+    # 인사이트등급
+    gm = re.search(r'인사이트등급\s*:\s*([SABC])', body, re.IGNORECASE)
+    insight_grade = gm.group(1).upper() if gm else ""
+
+    whys = {f"Why{i + 1}": item["a"] for i, item in enumerate(chain) if item.get("a")}
+
+    return {"chain": chain, "insight": insight, "insight_grade": insight_grade, "whys": whys}
 
 
 def parse_facts(text: str) -> list[dict]:
@@ -362,9 +396,6 @@ async def analyze_facts_stream(body: AnalyzeRequest, db: Session = Depends(get_d
         kw in (r.content or "") for kw in ["서비스 접속이 원활하지 않", "잠시 후에 다시"]
     )]
 
-    BATCH_SIZE = 4
-    batches = [valid_refs[i:i + BATCH_SIZE] for i in range(0, len(valid_refs), BATCH_SIZE)]
-
     def sse(obj: dict) -> str:
         return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
 
@@ -373,29 +404,31 @@ async def analyze_facts_stream(body: AnalyzeRequest, db: Session = Depends(get_d
             yield sse({"type": "error", "message": "분석할 유효한 레퍼런스가 없습니다"})
             return
 
-        # ── Phase 1: 팩트 추출 (메모리에만 누적, DB 저장 없음) ───────────────
+        # ── Phase 1: 팩트 추출 (레퍼런스 1개씩, reference_id 추적) ────────────
         all_items: list[dict] = []   # {"f_data": ..., "why_data": ...}
-        analyzed_ref_ids: list[str] = []   # Ollama 성공한 배치의 ref id
+        analyzed_ref_ids: list[str] = []
 
-        for batch_idx, batch in enumerate(batches):
-            batch_num = batch_idx + 1
-            yield sse({"type": "stage1", "batch": batch_num, "total": len(batches)})
+        for ref_idx, ref in enumerate(valid_refs):
+            ref_num = ref_idx + 1
+            yield sse({"type": "stage1", "batch": ref_num, "total": len(valid_refs)})
 
             try:
-                raw1 = await _call_ollama(FAST_MODEL, build_extraction_prompt(batch),
-                                          num_predict=600, num_ctx=4096, timeout=120)
+                raw1 = await _call_ollama(FAST_MODEL, build_extraction_prompt([ref]),
+                                          num_predict=800, num_ctx=4096, timeout=120)
+                ref_summary = parse_ref_summary(raw1)
                 batch_facts = parse_extracted_facts(raw1)
-                print(f"[extract batch={batch_num}] {len(batch_facts)}facts / {len(raw1)}chars", flush=True)
+                print(f"[extract ref={ref_num}] {len(batch_facts)}facts / summary={bool(ref_summary)} / {len(raw1)}chars", flush=True)
                 if not batch_facts:
-                    print(f"[extract batch={batch_num}] preview: {raw1[:400]}", flush=True)
+                    print(f"[extract ref={ref_num}] preview: {raw1[:400]}", flush=True)
                 for f in batch_facts:
+                    f["reference_id"] = ref.id
+                    f["reference_summary"] = ref_summary
                     all_items.append({"f_data": f, "why_data": None})
-                # Ollama 성공한 batch의 ref만 analyzed 처리 대상으로 등록
-                analyzed_ref_ids.extend([r.id for r in batch])
+                analyzed_ref_ids.append(ref.id)
             except Exception as e:
-                print(f"[extract batch={batch_num}] error: {str(e) or repr(e)}", flush=True)
-                yield sse({"type": "batch_error", "batch": batch_num,
-                           "message": f"배치 {batch_num} 추출 실패: {str(e)}"})
+                print(f"[extract ref={ref_num}] error: {str(e) or repr(e)}", flush=True)
+                yield sse({"type": "batch_error", "batch": ref_num,
+                           "message": f"레퍼런스 {ref_num} 추출 실패: {str(e)}"})
 
         if not all_items:
             yield sse({"type": "done", "saved": 0})
@@ -404,18 +437,22 @@ async def analyze_facts_stream(body: AnalyzeRequest, db: Session = Depends(get_d
         # ── Phase 2: 5Why 추론 (메모리에만 저장, DB 저장 없음) ────────────────
         for i, item in enumerate(all_items):
             yield sse({"type": "stage2", "fact": i + 1, "total": len(all_items)})
-            try:
-                raw2 = await _call_ollama(DEFAULT_MODEL,
-                                          build_why_prompt(item["f_data"]["raw_fact"],
-                                                           item["f_data"]["service"]),
-                                          num_predict=600, num_ctx=3072, timeout=120)
-                item["why_data"] = parse_whys(raw2)
-                print(f"[reason fact={i+1}] whys={list(item['why_data']['whys'].keys())}", flush=True)
-                if not item["why_data"]["whys"]:
-                    print(f"[reason fact={i+1}] empty. preview: {raw2[:400]}", flush=True)
-            except Exception as e:
-                print(f"[reason fact={i+1}] error: {str(e) or repr(e)}", flush=True)
-                item["why_data"] = {"whys": {}, "insight_grade": ""}
+            why_data = {"chain": [], "insight": "", "insight_grade": "", "whys": {}}
+            for attempt in range(2):
+                try:
+                    raw2 = await _call_ollama(DEFAULT_MODEL,
+                                              build_why_prompt(item["f_data"]["raw_fact"],
+                                                               item["f_data"]["service"]),
+                                              num_predict=1000, num_ctx=3072, timeout=150)
+                    why_data = parse_whys(raw2)
+                    steps = len(why_data["chain"])
+                    print(f"[reason fact={i+1} attempt={attempt+1}] chain={steps}steps", flush=True)
+                    if steps >= 1:  # Q1/A1만 있어도 진행
+                        break
+                    print(f"[reason fact={i+1} attempt={attempt+1}] empty. preview: {raw2[:300]}", flush=True)
+                except Exception as e:
+                    print(f"[reason fact={i+1} attempt={attempt+1}] error: {str(e) or repr(e)}", flush=True)
+            item["why_data"] = why_data
 
         # ── 최종 저장: 추출+추론 완료 후 한 번에 DB 커밋 ───────────────────────
         saved = 0
@@ -424,26 +461,35 @@ async def analyze_facts_stream(body: AnalyzeRequest, db: Session = Depends(get_d
                 now = datetime.utcnow()
                 for item in all_items:
                     f_data = item["f_data"]
-                    why_data = item["why_data"] or {"whys": {}, "insight_grade": ""}
-                    whys = why_data["whys"]
+                    why_data = item["why_data"] or {"chain": [], "insight": "", "insight_grade": "", "whys": {}}
+                    chain = why_data.get("chain", [])
+                    insight = why_data.get("insight", "")
 
                     fact_id = str(uuid.uuid4())
                     meta = json.dumps({
                         "grade": f_data["grade"], "fact_type": f_data["fact_type"],
                         "service": f_data["service"], "gates": f_data["gates"],
-                        "insight_grade": why_data["insight_grade"], "whys": whys,
+                        "insight_grade": why_data["insight_grade"],
                         "classification_reason": f_data.get("classification_reason", ""),
+                        "reference_summary": f_data.get("reference_summary", ""),
                     }, ensure_ascii=False)
                     content = f"{f_data['content']}\n__META__{meta}"
                     db.add(Fact(id=fact_id, project_id=body.project_id,
+                                reference_id=f_data.get("reference_id"),
                                 content=content, created_at=now))
-                    if whys:
+                    if chain:
                         db.add(FiveWhys(
                             id=str(uuid.uuid4()), project_id=body.project_id, fact_id=fact_id,
                             fact_content=f_data["raw_fact"],
-                            why1=whys.get("Why1(서비스)", ""), why2=whys.get("Why2(산업)", ""),
-                            why3=whys.get("Why3(사용자)", ""), why4=whys.get("Why4(구조)", ""),
-                            why5=whys.get("Why5(확장)", ""), principle="", created_at=now,
+                            why1=chain[0]["a"] if len(chain) > 0 else "",
+                            why2=chain[1]["a"] if len(chain) > 1 else "",
+                            why3=chain[2]["a"] if len(chain) > 2 else "",
+                            why4=chain[3]["a"] if len(chain) > 3 else "",
+                            why5=chain[4]["a"] if len(chain) > 4 else "",
+                            chain_json=json.dumps(chain, ensure_ascii=False),
+                            insight=insight,
+                            principle="",
+                            created_at=now,
                         ))
                     saved += 1
 
@@ -467,6 +513,81 @@ async def analyze_facts_stream(body: AnalyzeRequest, db: Session = Depends(get_d
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/facts/{fact_id}/whys")
+async def regenerate_whys(fact_id: str, db: Session = Depends(get_db)):
+    """기존 팩트의 5Why를 재생성한다."""
+    fact = db.query(Fact).filter(Fact.id == fact_id).first()
+    if not fact:
+        raise HTTPException(status_code=404, detail="팩트를 찾을 수 없습니다")
+
+    META_SEP = "\n__META__"
+    idx = fact.content.find(META_SEP)
+    if idx == -1:
+        raise HTTPException(status_code=422, detail="메타데이터가 없는 팩트입니다")
+
+    try:
+        meta = json.loads(fact.content[idx + len(META_SEP):])
+    except Exception:
+        raise HTTPException(status_code=422, detail="메타데이터 파싱 실패")
+
+    raw_fact = fact.content[:idx].strip()
+    # 팩트 텍스트에서 [등급 유형] [서비스] 접두사 제거
+    raw_fact = re.sub(r"^\[.*?\]\s*", "", raw_fact).strip()
+    service = meta.get("service", "")
+
+    why_data = {"chain": [], "insight": "", "insight_grade": "", "whys": {}}
+    for attempt in range(2):
+        try:
+            raw2 = await _call_ollama(DEFAULT_MODEL, build_why_prompt(raw_fact, service),
+                                      num_predict=1000, num_ctx=3072, timeout=150)
+            why_data = parse_whys(raw2)
+            steps = len(why_data["chain"])
+            print(f"[regen fact={fact_id} attempt={attempt+1}] chain={steps}steps", flush=True)
+            if steps >= 1:
+                break
+            print(f"[regen fact={fact_id} attempt={attempt+1}] empty. preview: {raw2[:300]}", flush=True)
+        except Exception as e:
+            print(f"[regen fact={fact_id} attempt={attempt+1}] error: {str(e) or repr(e)}", flush=True)
+
+    chain = why_data.get("chain", [])
+    if not chain:
+        raise HTTPException(status_code=500, detail="5Why 생성 실패 — Ollama 응답을 파싱할 수 없습니다. 백엔드 로그를 확인하세요.")
+
+    insight = why_data.get("insight", "")
+
+    # 메타 업데이트
+    meta["insight_grade"] = why_data["insight_grade"]
+    display_part = fact.content[:idx]
+    fact.content = f"{display_part}{META_SEP}{json.dumps(meta, ensure_ascii=False)}"
+
+    # five_whys 테이블 업데이트 또는 생성
+    chain_json_str = json.dumps(chain, ensure_ascii=False)
+    existing_fw = db.query(FiveWhys).filter(FiveWhys.fact_id == fact_id).first()
+    if existing_fw:
+        existing_fw.why1 = chain[0]["a"] if len(chain) > 0 else ""
+        existing_fw.why2 = chain[1]["a"] if len(chain) > 1 else ""
+        existing_fw.why3 = chain[2]["a"] if len(chain) > 2 else ""
+        existing_fw.why4 = chain[3]["a"] if len(chain) > 3 else ""
+        existing_fw.why5 = chain[4]["a"] if len(chain) > 4 else ""
+        existing_fw.chain_json = chain_json_str
+        existing_fw.insight = insight
+    else:
+        db.add(FiveWhys(
+            id=str(uuid.uuid4()), project_id=fact.project_id, fact_id=fact_id,
+            fact_content=raw_fact,
+            why1=chain[0]["a"] if len(chain) > 0 else "",
+            why2=chain[1]["a"] if len(chain) > 1 else "",
+            why3=chain[2]["a"] if len(chain) > 2 else "",
+            why4=chain[3]["a"] if len(chain) > 3 else "",
+            why5=chain[4]["a"] if len(chain) > 4 else "",
+            chain_json=chain_json_str, insight=insight,
+            principle="", created_at=datetime.utcnow(),
+        ))
+
+    db.commit()
+    return {"ok": True, "chain": chain, "insight": insight, "insight_grade": why_data["insight_grade"]}
 
 
 @router.get("/models")

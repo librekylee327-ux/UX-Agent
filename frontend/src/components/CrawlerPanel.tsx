@@ -45,10 +45,12 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
         res = await api.crawl.search({ keyword, stage, project_id: projectId, save: true }) as typeof res;
       } else {
         const r = await api.crawl.url({ url, project_id: projectId, stage, save: true }) as CrawlResult;
+        if (r.error) throw new Error(`스크래핑 실패: ${r.error}`);
         res = { results: [r], count: 1 };
       }
       setResults(res.results || []);
-      if (res.results?.length) {
+      const successCount = (res.results || []).filter((r: CrawlResult) => !r.error).length;
+      if (successCount > 0) {
         setSaved(new Set(res.results.map((_: CrawlResult, i: number) => i)));
         onSaved?.();
       }
@@ -132,8 +134,12 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
 
       {/* Results */}
       {results.length > 0 && (
-        <div className="px-5 pb-4">
-          <p className="text-xs text-emerald-600">{results.length}개 저장됨 ✓</p>
+        <div className="px-5 pb-4 space-y-1">
+          {results.map((r, i) => (
+            <div key={i} className={`text-xs px-2.5 py-1.5 rounded-[10px] border ${r.error ? "bg-rose-50 border-rose-200 text-rose-600" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
+              {r.error ? `실패: ${r.error}` : `저장됨 ✓ ${r.title || r.url}`}
+            </div>
+          ))}
         </div>
       )}
     </div>

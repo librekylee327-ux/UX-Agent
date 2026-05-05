@@ -92,6 +92,8 @@ class FiveWhysCreate(BaseModel):
     why3: str = ""
     why4: str = ""
     why5: str = ""
+    chain_json: Optional[str] = None
+    insight: str = ""
     principle: str = ""
 
 
@@ -332,7 +334,9 @@ def _ser_fact(f: Fact):
 def _ser_fw(fw: FiveWhys):
     return {"id": fw.id, "project_id": fw.project_id, "fact_id": fw.fact_id,
             "fact_content": fw.fact_content, "why1": fw.why1, "why2": fw.why2,
-            "why3": fw.why3, "why4": fw.why4, "why5": fw.why5, "principle": fw.principle,
+            "why3": fw.why3, "why4": fw.why4, "why5": fw.why5,
+            "chain_json": fw.chain_json, "insight": fw.insight or "",
+            "principle": fw.principle,
             "created_at": fw.created_at.isoformat() if fw.created_at else None}
 
 

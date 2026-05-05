@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { Reference, Fact, FiveWhys } from "@/lib/types";
+import type { Reference, Fact, FiveWhys, WhyChainStep } from "@/lib/types";
 
 interface Props { projectId: string; refreshKey?: number; }
 
@@ -14,8 +14,8 @@ interface FactMeta {
   service: string;
   gates: string;
   insight_grade: string;
-  whys: Record<string, string>;
   classification_reason?: string;
+  reference_summary?: string;
 }
 
 function parseFact(content: string): { display: string; meta: FactMeta | null } {
@@ -27,6 +27,31 @@ function parseFact(content: string): { display: string; meta: FactMeta | null } 
     return { display: content.slice(0, idx), meta: null };
   }
 }
+
+function parseChain(fw: FiveWhys): WhyChainStep[] {
+  if (fw.chain_json) {
+    try { return JSON.parse(fw.chain_json); } catch { /* fall through */ }
+  }
+  // backward compat: 구 형식 (5가지 시각) → 체인으로 변환
+  const legacyQs = [
+    "왜 이런 현상이 나타나는가?",
+    "그 원인은 어디서 비롯되는가?",
+    "왜 그 구조가 형성됐는가?",
+    "그 구조를 가능하게 한 선행 조건은?",
+    "이 구조는 어떻게 지속·확장되는가?",
+  ];
+  return [fw.why1, fw.why2, fw.why3, fw.why4, fw.why5]
+    .map((a, i) => ({ q: legacyQs[i], a: a || "" }))
+    .filter((item, i) => i === 0 || item.a);
+}
+
+const EMPTY_CHAIN: WhyChainStep[] = [
+  { q: "왜 이런 현상이 나타나는가?", a: "" },
+  { q: "", a: "" },
+  { q: "", a: "" },
+  { q: "", a: "" },
+  { q: "", a: "" },
+];
 
 function formatTimestamp(iso: string): string {
   const utc = new Date(iso.endsWith("Z") ? iso : iso + "Z");
@@ -60,12 +85,11 @@ const GATE_DESC: Record<string, string> = {
 };
 
 const TYPE_DESC: Record<string, string> = {
-  "TYPE A": "행동 비관행: 사용자·서비스가 일반적 패턴에서 벗어난 행동",
-  "TYPE B": "구조 변화: 시장·산업·서비스 구조가 변화하는 신호",
-  "TYPE C": "사용자 이상치: 예상치 못한 사용자 반응·행동 패턴",
-  "TYPE D": "수익/비용 이상: 비관행적 수익화 모델이나 비용 구조",
+  "TYPE A": "행동 비관행",
+  "TYPE B": "구조 변화",
+  "TYPE C": "사용자 이상치",
+  "TYPE D": "수익/비용 이상",
 };
-
 
 
 export default function PurposeStage({ projectId, refreshKey }: Props) {
@@ -75,7 +99,6 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
   const [newFact, setNewFact] = useState("");
   const [bulkInput, setBulkInput] = useState("");
   const [showBulk, setShowBulk] = useState(false);
-  const [editingFw, setEditingFw] = useState<Partial<FiveWhys> | null>(null);
   const [activeRefId, setActiveRefId] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeResult, setAnalyzeResult] = useState<{ saved: number; error?: string } | null>(null);
@@ -90,6 +113,12 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
   const [refTab, setRefTab] = useState<"all" | "pending" | "done">("all");
   const [refPage, setRefPage] = useState(0);
   const [pendingDelete, setPendingDelete] = useState<{ type: "fact" | "ref" | "fw"; id: string } | null>(null);
+
+  // 5 Why 편집 상태
+  const [editingFw, setEditingFw] = useState<Partial<FiveWhys> | null>(null);
+  const [editingChain, setEditingChain] = useState<WhyChainStep[] | null>(null);
+  const [editingInsight, setEditingInsight] = useState("");
+  const [regenningFactId, setRegenningFactId] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -179,9 +208,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
       resultSet = true;
       setAnalyzeResult({ saved: 0, error: e instanceof Error ? e.message : "오류 발생" });
     } finally {
-      if (!resultSet) {
-        setAnalyzeResult({ saved: 0 });
-      }
+      if (!resultSet) setAnalyzeResult({ saved: 0 });
       setAnalyzing(false);
       setAnalyzeProgress(null);
     }
@@ -197,7 +224,6 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
     setFacts(f);
     setFiveWhys(fw);
   }
-
 
   async function addFact(refId?: string) {
     if (!newFact.trim()) return;
@@ -223,15 +249,67 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
     setFacts((p) => p.filter((f) => f.id !== id));
   }
 
-  async function saveFiveWhys() {
-    if (!editingFw) return;
-    if (editingFw.id) {
-      await api.fiveWhys.update(editingFw.id, editingFw);
+  function openEditing(factId: string, display: string) {
+    setExpandedFactId(factId);
+    const existing = fiveWhys.find((fw) => fw.fact_id === factId);
+    if (existing) {
+      setEditingFw(existing);
+      setEditingChain(parseChain(existing));
+      setEditingInsight(existing.insight ?? "");
     } else {
-      await api.fiveWhys.create(projectId, editingFw);
+      setEditingFw({ fact_id: factId, fact_content: display, principle: "" });
+      setEditingChain(EMPTY_CHAIN.map((s) => ({ ...s })));
+      setEditingInsight("");
     }
+  }
+
+  function closeEditing() {
     setEditingFw(null);
+    setEditingChain(null);
+    setEditingInsight("");
+    setExpandedFactId(null);
+  }
+
+  async function saveFiveWhys() {
+    if (!editingFw || !editingChain) return;
+    const cleanChain = editingChain.filter((item, i) => i === 0 || item.q || item.a);
+    const payload = {
+      ...editingFw,
+      why1: cleanChain[0]?.a ?? "",
+      why2: cleanChain[1]?.a ?? "",
+      why3: cleanChain[2]?.a ?? "",
+      why4: cleanChain[3]?.a ?? "",
+      why5: cleanChain[4]?.a ?? "",
+      chain_json: JSON.stringify(cleanChain),
+      insight: editingInsight,
+    };
+    if (editingFw.id) {
+      await api.fiveWhys.update(editingFw.id, payload);
+    } else {
+      await api.fiveWhys.create(projectId, payload);
+    }
+    closeEditing();
     load();
+  }
+
+  async function regenFiveWhys(factId: string) {
+    setRegenningFactId(factId);
+    try {
+      const res = await fetch(`http://localhost:8000/api/analyze/facts/${factId}/whys`, { method: "POST" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.detail || "5Why 재생성 실패");
+        return;
+      }
+      const data = await res.json();
+      if (data.chain) {
+        setEditingChain(data.chain);
+        setEditingInsight(data.insight ?? "");
+      }
+      await load();
+    } finally {
+      setRegenningFactId(null);
+    }
   }
 
   async function deleteFw(id: string) {
@@ -248,7 +326,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
     setPendingDelete(null);
   }
 
-  const principles = fiveWhys.filter((fw) => fw.principle.trim());
+  const principles = fiveWhys.filter((fw) => fw.principle?.trim());
   const pendingRefs = refs.filter((r) => !r.analyzed);
   const analyzedRefs = refs.filter((r) => r.analyzed);
 
@@ -279,9 +357,9 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
               {analyzing
                 ? <span className="tabular-nums">
                     {analyzeProgress?.stage === 1
-                      ? `배치 ${analyzeProgress.batch}/${analyzeProgress.total} 팩트 추출 중`
+                      ? `레퍼런스 ${analyzeProgress.batch}/${analyzeProgress.total} 팩트 추출 중`
                       : analyzeProgress?.stage === 2
-                      ? `5Why 추론 중 (${analyzeProgress.fact}/${analyzeProgress.total})`
+                      ? `5Why 체인 추론 중 (${analyzeProgress.fact}/${analyzeProgress.total})`
                       : "분석 준비 중"
                     }{ellipsis}
                     <span className="invisible">{".".repeat(3 - ellipsis.length)}</span>
@@ -299,10 +377,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
               : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}
           >
             <span>{analyzeResult.error ? `오류: ${analyzeResult.error}` : `팩트 ${analyzeResult.saved}개 자동 추출 완료 ✓`}</span>
-            <button
-              onClick={() => setAnalyzeResult(null)}
-              className="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity"
-            >×</button>
+            <button onClick={() => setAnalyzeResult(null)} className="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity">×</button>
           </div>
         )}
 
@@ -310,7 +385,6 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
           <p className="text-xs text-[#707070] px-1">우측 크롤러에서 버즈리포트를 수집하세요</p>
         ) : (
           <>
-            {/* 탭 */}
             <div className="flex gap-1 mb-3">
               {(
                 [
@@ -335,7 +409,6 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
               ))}
             </div>
 
-            {/* 가로 카드 그리드 */}
             {(() => {
               const PAGE_SIZE = 4;
               const list = refTab === "all" ? refs : refTab === "pending" ? pendingRefs : analyzedRefs;
@@ -384,16 +457,13 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                     ))}
                   </div>
 
-                  {/* 페이지네이션 */}
                   <div className="flex items-center justify-between mt-2">
                     <button
                       onClick={() => setRefPage((p) => Math.max(0, p - 1))}
                       disabled={refPage === 0}
                       className="text-xs text-[#707070] hover:text-[#1d1d1f] disabled:opacity-0 px-2 py-1 rounded transition-colors"
                     >← 이전</button>
-                    <span className="text-xs text-[#707070] tabular-nums">
-                      {refPage + 1} / {totalPages}
-                    </span>
+                    <span className="text-xs text-[#707070] tabular-nums">{refPage + 1} / {totalPages}</span>
                     <button
                       onClick={() => setRefPage((p) => Math.min(totalPages - 1, p + 1))}
                       disabled={refPage === totalPages - 1}
@@ -467,67 +537,67 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             const gradeStyle = meta?.grade ? (GRADE_STYLE[meta.grade] ?? "") : "";
             const typeStyle = meta?.fact_type ? (TYPE_STYLE[meta.fact_type] ?? "") : "";
             const gates = meta?.gates ? meta.gates.split(",").map((g) => g.trim()).filter(Boolean) : [];
+            const existingFw = fiveWhys.find((fw) => fw.fact_id === f.id);
+            const isEditing = editingFw?.fact_id === f.id;
 
             return (
               <div
                 key={f.id}
-                onClick={() => {
-                  if (!meta) return;
-                  if (isOpen) {
-                    setEditingFw(null);
-                    setExpandedFactId(null);
-                  } else {
-                    setExpandedFactId(f.id);
-                    const existing = fiveWhys.find((fw) => fw.fact_id === f.id);
-                    setEditingFw(existing ?? { fact_id: f.id, fact_content: display, why1: "", why2: "", why3: "", why4: "", why5: "", principle: "" });
-                  }
-                }}
-                className={`bg-white border border-[#e8e8ed] rounded-[10px] group ${meta ? "cursor-pointer" : ""}`}
+                className={`bg-white border border-[#e8e8ed] rounded-[10px] ${meta ? "cursor-pointer" : ""}`}
               >
-                <div className="flex items-start gap-2 p-2.5 sticky top-0 z-10 bg-white rounded-t-[10px] border-b border-transparent" style={{ borderBottomColor: isOpen ? "#f5f5f7" : "transparent" }}>
+                {/* 팩트 헤더 */}
+                <div
+                  className="flex items-start gap-2 p-2.5 bg-white rounded-t-[10px]"
+                  style={{ borderBottom: isOpen ? "1px solid #f5f5f7" : "none" }}
+                  onClick={() => {
+                    if (!meta) return;
+                    if (isOpen) closeEditing();
+                    else openEditing(f.id, display);
+                  }}
+                >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[#1d1d1f] leading-snug">{display}</p>
                     <p className="text-[10px] text-[#707070] mt-1.5 tabular-nums">{formatTimestamp(f.created_at)}</p>
                   </div>
+                  {meta && (
+                    <span className="text-[#d2d2d7] text-xs flex-shrink-0 mt-0.5">
+                      {isOpen ? "▲" : "▼"}
+                    </span>
+                  )}
                 </div>
 
-                {isOpen && (meta || editingFw?.fact_id === f.id) && (
+                {/* 펼침 패널 */}
+                {isOpen && (
                   <div
-                    className="border-t border-[#f5f5f7] px-3 py-3 bg-[#f5f5f7]"
+                    className="border-t border-[#f5f5f7] px-3 py-3 bg-[#f5f5f7] rounded-b-[10px]"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className={meta ? "grid grid-cols-[1fr_2fr] gap-x-3" : ""}>
-                      {/* 배지 */}
-                      {meta && (
-                        <div className="flex flex-wrap items-center gap-1.5 pb-3">
-                          {meta.grade && (
-                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${gradeStyle}`}>
-                              {meta.grade}등급
-                            </span>
-                          )}
-                          {meta.fact_type && (
-                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded border flex-shrink-0 ${typeStyle}`}>
-                              {meta.fact_type}{TYPE_DESC[meta.fact_type] ? ` — ${TYPE_DESC[meta.fact_type].split(":")[0]}` : ""}
-                            </span>
-                          )}
-                          {meta.insight_grade && meta.insight_grade !== meta.grade && (
-                            <span className="text-xs text-[#707070] px-1.5 py-0.5 rounded border border-[#e8e8ed] bg-white flex-shrink-0">
-                              인사이트 {meta.insight_grade}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {meta && <div />}
-
-                      {/* 분류근거 + Gate + 유형 */}
+                    <div className={meta ? "grid grid-cols-[1fr_2fr] gap-x-4" : ""}>
+                      {/* 왼쪽: 배지 + Gate + 분류근거 */}
                       {meta && (
                         <div className="space-y-3">
-                          {meta.classification_reason && (
+                          {/* 배지 */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {meta.grade && (
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${gradeStyle}`}>
+                                {meta.grade}등급
+                              </span>
+                            )}
+                            {meta.fact_type && (
+                              <span className={`text-xs font-medium px-1.5 py-0.5 rounded border flex-shrink-0 ${typeStyle}`}>
+                                {meta.fact_type}{TYPE_DESC[meta.fact_type] ? ` — ${TYPE_DESC[meta.fact_type]}` : ""}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 레퍼런스 요약 */}
+                          {meta.reference_summary && (
                             <p className="text-xs text-[#474747] leading-relaxed bg-white rounded px-2 py-1.5 border border-[#e8e8ed]">
-                              {meta.classification_reason}
+                              {meta.reference_summary}
                             </p>
                           )}
+
+                          {/* Gate 판정 */}
                           <div className="space-y-1.5">
                             {["Gate1", "Gate2", "Gate3"].map((g) => {
                               const passed = gates.some((p) => p.replace(/\s/g, "") === g.replace(/\s/g, ""));
@@ -550,63 +620,110 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                         </div>
                       )}
 
-                      {/* 5 Whys 컨테이너 */}
+                      {/* 오른쪽: 5 Whys 체인 */}
                       <div>
-                        {editingFw?.fact_id === f.id ? (
-                          <div className="bg-blue-50 border border-blue-200 rounded-[10px] px-3 py-3 space-y-2">
-                            <p className="text-xs font-semibold text-blue-700 mb-1">5 Whys 역추론</p>
-                            {(
-                              [
-                                { key: "why1" as const, label: "서비스 시각", desc: "이 서비스는 왜 이 선택을 하는가?" },
-                                { key: "why2" as const, label: "산업 시각",   desc: "왜 기존 플레이어들은 이 선택을 하지 않았는가(못했는가)?" },
-                                { key: "why3" as const, label: "사용자 시각", desc: "왜 사용자는 이 방식을 수용하거나 선택하는가?" },
-                                { key: "why4" as const, label: "구조 시각",   desc: "이 선택이 가능한 선행 조건은 무엇인가?" },
-                                { key: "why5" as const, label: "확장 시각",   desc: "이 구조는 지속 가능한가? 다른 도메인으로 이전 가능한가?" },
-                              ]
-                            ).map(({ key, label, desc }) => (
-                              <div key={key}>
-                                <label className="text-xs mb-0.5 block">
-                                  <span className="font-medium text-[#1d1d1f]">{label}</span>
-                                  <span className="text-[#707070]"> — {desc}</span>
-                                </label>
-                                <textarea
-                                  value={editingFw[key] ?? ""}
-                                  onChange={(e) => {
-                                    setEditingFw({ ...editingFw, [key]: e.target.value });
-                                    e.target.style.height = "auto";
-                                    e.target.style.height = e.target.scrollHeight + "px";
-                                  }}
-                                  rows={2}
-                                  placeholder={desc}
-                                  className="w-full bg-white border border-[#e8e8ed] rounded-[10px] px-2 py-1.5 text-xs text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] resize-none overflow-hidden transition-colors"
-                                  style={{ height: "auto" }}
-                                  ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
-                                />
+                        {isEditing && editingChain ? (
+                          /* ── 편집 모드 ── */
+                          <div className="bg-blue-50 border border-blue-200 rounded-[10px] px-3 py-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold text-blue-700">5 Whys 체인 추론</p>
+                              {editingChain.every((item) => !item.a) && (
+                                <button
+                                  onClick={() => regenFiveWhys(f.id)}
+                                  disabled={regenningFactId === f.id}
+                                  className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50 px-2 py-0.5 rounded border border-blue-200 bg-white transition-colors"
+                                >
+                                  {regenningFactId === f.id ? "생성 중…" : "AI 생성"}
+                                </button>
+                              )}
+                            </div>
+
+                            {editingChain.map((item, i) => (
+                              <div key={i} className="space-y-1.5">
+                                {/* Q */}
+                                <div className="flex items-start gap-1.5">
+                                  <span className="text-[10px] font-bold text-blue-400 w-5 flex-shrink-0 mt-1.5">Q{i + 1}</span>
+                                  <textarea
+                                    value={item.q}
+                                    onChange={(e) => {
+                                      const next = [...editingChain];
+                                      next[i] = { ...next[i], q: e.target.value };
+                                      setEditingChain(next);
+                                      e.target.style.height = "auto";
+                                      e.target.style.height = e.target.scrollHeight + "px";
+                                    }}
+                                    rows={1}
+                                    placeholder={i === 0 ? "왜 이런 현상이 나타나는가?" : "이전 답변을 파고드는 Why 질문"}
+                                    className="flex-1 bg-blue-100/50 border border-blue-200 rounded-[8px] px-2 py-1 text-xs text-blue-700 placeholder-blue-300 focus:outline-none focus:border-blue-400 resize-none overflow-hidden"
+                                    style={{ height: "auto" }}
+                                    ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+                                  />
+                                </div>
+                                {/* A */}
+                                <div className="flex items-start gap-1.5 pl-1">
+                                  <span className="text-[10px] font-bold text-[#707070] w-4 flex-shrink-0 mt-1.5">A</span>
+                                  <textarea
+                                    value={item.a}
+                                    onChange={(e) => {
+                                      const next = [...editingChain];
+                                      next[i] = { ...next[i], a: e.target.value };
+                                      setEditingChain(next);
+                                      e.target.style.height = "auto";
+                                      e.target.style.height = e.target.scrollHeight + "px";
+                                    }}
+                                    rows={2}
+                                    placeholder="구체적 답변"
+                                    className="flex-1 bg-white border border-[#e8e8ed] rounded-[8px] px-2 py-1 text-xs text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] resize-none overflow-hidden"
+                                    style={{ height: "auto" }}
+                                    ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+                                  />
+                                </div>
+                                {i < editingChain.length - 1 && (
+                                  <div className="ml-5 text-[#d2d2d7] text-xs leading-none">↓</div>
+                                )}
                               </div>
                             ))}
+
+                            {/* 핵심 인사이트 */}
                             <div>
-                              <label className="text-xs mb-0.5 block">
-                                <span className="font-semibold text-amber-600">보편 원리</span>
-                                <span className="text-[#707070]"> — 5개 시각의 추론에서 도달한 본질적 원리</span>
-                              </label>
+                              <label className="text-xs font-semibold text-amber-600 mb-1 block">핵심 인사이트</label>
                               <textarea
-                                value={editingFw.principle ?? ""}
+                                value={editingInsight}
                                 onChange={(e) => {
-                                  setEditingFw({ ...editingFw, principle: e.target.value });
+                                  setEditingInsight(e.target.value);
                                   e.target.style.height = "auto";
                                   e.target.style.height = e.target.scrollHeight + "px";
                                 }}
                                 rows={2}
-                                placeholder="5개 시각에서 도달한 본질 원리를 정리하세요"
-                                className="w-full bg-white border border-amber-200 rounded-[10px] px-2 py-1.5 text-xs text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-amber-400 resize-none overflow-hidden transition-colors"
+                                placeholder="5 Why 체인에서 도달한 본질적 원인"
+                                className="w-full bg-white border border-amber-200 rounded-[8px] px-2 py-1.5 text-xs text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-amber-400 resize-none overflow-hidden"
                                 style={{ height: "auto" }}
                                 ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
                               />
                             </div>
+
+                            {/* 보편 원리 */}
+                            <div>
+                              <label className="text-xs font-semibold text-amber-600 mb-1 block">보편 원리 <span className="font-normal text-[#707070]">— 직접 작성</span></label>
+                              <textarea
+                                value={editingFw?.principle ?? ""}
+                                onChange={(e) => {
+                                  setEditingFw((prev) => prev ? { ...prev, principle: e.target.value } : prev);
+                                  e.target.style.height = "auto";
+                                  e.target.style.height = e.target.scrollHeight + "px";
+                                }}
+                                rows={2}
+                                placeholder="5개 Why에서 도달한 본질 원리를 나만의 언어로 정리하세요"
+                                className="w-full bg-white border border-amber-100 rounded-[8px] px-2 py-1.5 text-xs text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-amber-300 resize-none overflow-hidden"
+                                style={{ height: "auto" }}
+                                ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+                              />
+                            </div>
+
                             <div className="flex gap-2 pt-1">
                               <button
-                                onClick={() => setEditingFw(null)}
-                                className="flex-1 text-xs bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] py-1.5 rounded-full transition-colors"
+                                onClick={closeEditing}
+                                className="flex-1 text-xs bg-white hover:bg-[#f5f5f7] text-[#1d1d1f] py-1.5 rounded-full border border-[#e8e8ed] transition-colors"
                               >취소</button>
                               <button
                                 onClick={saveFiveWhys}
@@ -614,35 +731,62 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                               >저장</button>
                             </div>
                           </div>
-                        ) : (() => {
-                          const existing = fiveWhys.find((fw) => fw.fact_id === f.id);
-                          if (!existing) return null;
-                          return (
-                            <div className="bg-blue-50 border border-blue-200 rounded-[10px] px-3 py-3 space-y-2">
-                              <p className="text-xs font-semibold text-blue-700 mb-1">5 Whys 역추론</p>
-                              {(
-                                [
-                                  { key: "why1" as const, label: "서비스 시각" },
-                                  { key: "why2" as const, label: "산업 시각" },
-                                  { key: "why3" as const, label: "사용자 시각" },
-                                  { key: "why4" as const, label: "구조 시각" },
-                                  { key: "why5" as const, label: "확장 시각" },
-                                ]
-                              ).map(({ key, label }) => existing[key] ? (
-                                <div key={key}>
-                                  <p className="text-xs text-[#707070] mb-0.5">{label}</p>
-                                  <p className="text-xs text-[#1d1d1f] leading-relaxed">{existing[key]}</p>
-                                </div>
-                              ) : null)}
-                              {existing.principle && (
-                                <div className="mt-1 p-2 bg-amber-50 border border-amber-200 rounded-[10px]">
-                                  <p className="text-xs font-semibold text-amber-600 mb-0.5">보편 원리</p>
-                                  <p className="text-xs text-amber-800 leading-relaxed">{existing.principle}</p>
-                                </div>
-                              )}
+                        ) : existingFw ? (
+                          /* ── 읽기 모드 ── */
+                          <div className="bg-blue-50 border border-blue-200 rounded-[10px] px-3 py-3">
+                            <div className="flex items-center justify-between mb-2.5">
+                              <p className="text-xs font-semibold text-blue-700">5 Whys 체인 추론</p>
+                              <button
+                                onClick={() => openEditing(f.id, display)}
+                                className="text-xs text-blue-500 hover:text-blue-700 px-2 py-0.5 rounded border border-blue-200 bg-white transition-colors"
+                              >편집</button>
                             </div>
-                          );
-                        })()}
+
+                            <div className="space-y-2">
+                              {parseChain(existingFw).map((item, i, arr) => (
+                                <div key={i}>
+                                  <div className="flex items-start gap-1.5">
+                                    <span className="text-[10px] font-bold text-blue-400 w-5 flex-shrink-0 mt-0.5">Q{i + 1}</span>
+                                    <p className="text-xs text-blue-600 font-medium leading-relaxed">{item.q}</p>
+                                  </div>
+                                  {item.a && (
+                                    <div className="flex items-start gap-1.5 mt-1 pl-1">
+                                      <span className="text-[10px] font-bold text-[#707070] w-4 flex-shrink-0 mt-0.5">A</span>
+                                      <p className="text-xs text-[#1d1d1f] leading-relaxed">{item.a}</p>
+                                    </div>
+                                  )}
+                                  {i < arr.length - 1 && item.a && (
+                                    <div className="ml-5 mt-1.5 text-[#d2d2d7] text-xs leading-none">↓</div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            {existingFw.insight && (
+                              <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-[8px]">
+                                <p className="text-[10px] font-semibold text-amber-600 mb-0.5">핵심 인사이트</p>
+                                <p className="text-xs text-amber-800 leading-relaxed">{existingFw.insight}</p>
+                              </div>
+                            )}
+
+                            {existingFw.principle && (
+                              <div className="mt-2 p-2 bg-amber-50 border border-amber-100 rounded-[8px]">
+                                <p className="text-[10px] font-semibold text-amber-500 mb-0.5">보편 원리</p>
+                                <p className="text-xs text-amber-700 leading-relaxed">{existingFw.principle}</p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* ── 5Why 없음 ── */
+                          <div className="flex items-center justify-center h-20 rounded-[10px] border border-dashed border-blue-200 bg-blue-50/50">
+                            <button
+                              onClick={() => openEditing(f.id, display)}
+                              className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                            >
+                              + 5 Whys 추론 작성
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -656,13 +800,12 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
         </div>
       </section>
 
-
       {/* Principles */}
       {principles.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold text-[#1d1d1f] mb-3 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            추출된 혁신 원리 ({principles.length})
+            추출된 보편 원리 ({principles.length})
           </h3>
           <div className="space-y-2">
             {principles.map((fw) => (
@@ -672,35 +815,23 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                   <button onClick={() => setPendingDelete({ type: "fw", id: fw.id })} className="text-[#d2d2d7] hover:text-rose-500 text-xs flex-shrink-0">×</button>
                 </div>
                 {fw.fact_content && <p className="text-xs text-[#707070] mt-1.5">팩트: {fw.fact_content}</p>}
-                <button
-                  onClick={() => setEditingFw(fw)}
-                  className="text-xs text-[#707070] hover:text-[#0066cc] mt-1 transition-colors"
-                >5 Whys 보기</button>
               </div>
             ))}
           </div>
         </section>
       )}
+
       {pendingDelete && (
         <div
           className="fixed inset-0 bg-[#1d1d1f]/20 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setPendingDelete(null)}
         >
-          <div
-            className="bg-white rounded-[28px] p-6 w-full max-w-xs"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-white rounded-[28px] p-6 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
             <p className="text-sm font-semibold text-[#1d1d1f] mb-1">삭제하시겠어요?</p>
             <p className="text-xs text-[#707070] mb-4">삭제된 항목은 복구할 수 없습니다.</p>
             <div className="flex gap-2">
-              <button
-                onClick={() => setPendingDelete(null)}
-                className="flex-1 text-sm bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] py-2 rounded-full transition-colors"
-              >취소</button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 text-sm bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-full font-medium transition-colors"
-              >삭제</button>
+              <button onClick={() => setPendingDelete(null)} className="flex-1 text-sm bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] py-2 rounded-full transition-colors">취소</button>
+              <button onClick={confirmDelete} className="flex-1 text-sm bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-full font-medium transition-colors">삭제</button>
             </div>
           </div>
         </div>

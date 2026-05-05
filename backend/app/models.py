@@ -47,12 +47,14 @@ class FiveWhys(Base):
     project_id = Column(String, ForeignKey("projects.id", ondelete="CASCADE"))
     fact_id = Column(String, ForeignKey("facts.id", ondelete="CASCADE"), nullable=True)
     fact_content = Column(Text, default="")
-    why1 = Column(Text, default="")
-    why2 = Column(Text, default="")
-    why3 = Column(Text, default="")
-    why4 = Column(Text, default="")
-    why5 = Column(Text, default="")
-    principle = Column(Text, default="")
+    why1 = Column(Text, default="")  # A1 (backward compat)
+    why2 = Column(Text, default="")  # A2
+    why3 = Column(Text, default="")  # A3
+    why4 = Column(Text, default="")  # A4
+    why5 = Column(Text, default="")  # A5
+    chain_json = Column(Text, nullable=True)   # JSON: [{q, a}, ...] × 5
+    insight = Column(Text, default="")         # 핵심 인사이트 (AI 생성)
+    principle = Column(Text, default="")       # 보편 원리 (사용자 작성)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
