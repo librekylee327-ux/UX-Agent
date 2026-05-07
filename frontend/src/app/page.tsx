@@ -154,7 +154,7 @@ export default function HomePage() {
   const stageInfo = (n: number) => STAGES.find((s) => s.id === n) ?? STAGES[0];
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
+    <div className="min-h-screen">
       {/* Header */}
       <header className="bg-white border-b border-[#e8e8ed]">
         <div className="max-w-[1200px] mx-auto px-6 py-4">

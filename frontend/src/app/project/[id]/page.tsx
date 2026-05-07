@@ -81,7 +81,7 @@ export default function ProjectPage() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-[#f5f5f7] flex overflow-hidden">
+      <div className="h-screen flex overflow-hidden">
         <nav className="w-14 bg-white border-r border-[#e8e8ed] flex-shrink-0 h-screen" />
         <div className="flex-1 flex items-center justify-center text-[#707070]">로딩 중...</div>
       </div>
@@ -90,7 +90,7 @@ export default function ProjectPage() {
 
   if (!project) {
     return (
-      <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-[#707070] mb-4">프로젝트를 찾을 수 없습니다</p>
           <button onClick={() => router.push("/")} className="text-[#0066cc] hover:underline text-sm">← 돌아가기</button>
@@ -103,7 +103,7 @@ export default function ProjectPage() {
   const stageInfo = STAGES.find((s) => s.id === activeStage)!;
 
   return (
-    <div className="h-screen bg-[#f5f5f7] flex overflow-hidden">
+    <div className="h-screen flex overflow-hidden">
       {/* Left nav */}
       <nav className="w-14 bg-white border-r border-[#e8e8ed] flex flex-col items-center justify-between py-5 h-screen flex-shrink-0">
         <div className="flex flex-col items-center gap-1">
