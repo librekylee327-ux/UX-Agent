@@ -10,7 +10,7 @@ interface Props {
   onSaved?: () => void;
 }
 
-type Tab = "news" | "search" | "url";
+type Tab = "news" | "url";
 
 const STAGE_HINTS: Record<number, string> = {
   1: "버즈리포트 · 혁신 사례 · 트렌드",
@@ -20,9 +20,18 @@ const STAGE_HINTS: Record<number, string> = {
   5: "UX 사례 · 디자인 패턴 · 레퍼런스",
 };
 
+const DOMAIN_PLACEHOLDERS: Record<number, string> = {
+  1: "예: 모바일 앱, 한국 시장",
+  2: "예: 핀테크, B2B SaaS",
+  3: "예: 10대, 직장인, 노인",
+  4: "예: 불만, 이탈, 온보딩",
+  5: "예: 앱 디자인, 대시보드 UI",
+};
+
 export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
-  const [tab, setTab] = useState<Tab>("news");
+  const [tab, setTab] = useState<Tab>("url");
   const [keyword, setKeyword] = useState("");
+  const [domain, setDomain] = useState("");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<CrawlResult[]>([]);
@@ -40,9 +49,7 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
     try {
       let res: { results: CrawlResult[]; count: number };
       if (tab === "news") {
-        res = await api.crawl.news({ keyword, stage, project_id: projectId, save: true }) as typeof res;
-      } else if (tab === "search") {
-        res = await api.crawl.search({ keyword, stage, project_id: projectId, save: true }) as typeof res;
+        res = await api.crawl.news({ keyword, domain: domain.trim() || undefined, stage, project_id: projectId, save: true }) as typeof res;
       } else {
         const r = await api.crawl.url({ url, project_id: projectId, stage, save: true }) as CrawlResult;
         if (r.error) throw new Error(`스크래핑 실패: ${r.error}`);
@@ -62,9 +69,8 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
   }
 
   const TABS: { id: Tab; label: string }[] = [
+    { id: "url", label: "URL 직접입력" },
     { id: "news", label: "뉴스" },
-    { id: "search", label: "웹 검색" },
-    { id: "url", label: "URL 직접" },
   ];
 
   return (
@@ -100,13 +106,28 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
       {/* Form */}
       <form onSubmit={handleSearch} className="p-5 space-y-3">
         {tab !== "url" ? (
-          <input
-            type="text"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder={tab === "news" ? "키워드 입력 (예: 배달앱 트렌드)" : "검색어 입력"}
-            className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
-          />
+          <div className="space-y-2">
+            <div>
+              <label className="block text-[11px] text-[#707070] mb-1 font-medium">주제어 *</label>
+              <input
+                type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="예: 배달앱, 헬스케어 앱"
+                className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] text-[#707070] mb-1 font-medium">도메인 · 맥락 <span className="font-normal">(선택)</span></label>
+              <input
+                type="text"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder={DOMAIN_PLACEHOLDERS[stage] ?? "예: 모바일 앱, 한국 시장"}
+                className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
+              />
+            </div>
+          </div>
         ) : (
           <input
             type="url"
@@ -118,7 +139,7 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
         )}
         <button
           type="submit"
-          disabled={loading || (tab !== "url" ? !keyword.trim() : !url.trim())}
+          disabled={loading || (tab === "news" ? !keyword.trim() : !url.trim())}
           className="w-full bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-40 text-white text-sm font-normal py-2 rounded-full transition-colors"
         >
           {loading ? "수집 중..." : "수집 시작"}

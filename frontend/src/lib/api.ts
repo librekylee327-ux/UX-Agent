@@ -83,7 +83,7 @@ export const api = {
   },
 
   crawl: {
-    news: (data: { keyword: string; stage: number; project_id: string; save?: boolean }) =>
+    news: (data: { keyword: string; domain?: string; stage: number; project_id: string; save?: boolean }) =>
       req("/crawl/news", { method: "POST", body: JSON.stringify(data) }),
     search: (data: { keyword: string; stage: number; project_id: string; save?: boolean }) =>
       req("/crawl/search", { method: "POST", body: JSON.stringify(data) }),

@@ -187,7 +187,7 @@ def _parse_block(block: str, field_keys: list[str]) -> dict:
 
 
 def _make_fact_entry(data: dict) -> Optional[dict]:
-    fact_text = data.get("팩트", "").strip()
+    fact_text = re.sub(r'\s*3-Gate\s*판정\s*:[\s\S]*', '', data.get("팩트", "")).strip()
     if not fact_text or len(fact_text) < 5:
         return None
     grade = data.get("등급", "")

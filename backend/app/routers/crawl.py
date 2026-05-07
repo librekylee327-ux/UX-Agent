@@ -12,9 +12,10 @@ router = APIRouter(prefix="/api/crawl", tags=["crawl"])
 
 class SearchRequest(BaseModel):
     keyword: str
+    domain: str = ""
     stage: int = 1
     project_id: str
-    save: bool = True  # 자동으로 DB에 저장할지 여부
+    save: bool = True
 
 
 class UrlRequest(BaseModel):
@@ -26,22 +27,31 @@ class UrlRequest(BaseModel):
 
 @router.post("/news")
 async def crawl_news(body: SearchRequest, db: Session = Depends(get_db)):
-    results = await search_news(body.keyword, body.stage, limit=10)
+    combined = f"{body.keyword} {body.domain}".strip() if body.domain else body.keyword
+    results = await search_news(combined, body.stage, limit=4)
     if body.save:
+        existing_urls = {
+            row.url for row in
+            db.query(Reference.url).filter(Reference.project_id == body.project_id).all()
+        }
         for r in results:
             if r.get("error"):
                 continue
-            ref = Reference(
+            url = r.get("url", "")
+            if url in existing_urls:
+                r["_skipped"] = True
+                continue
+            existing_urls.add(url)
+            db.add(Reference(
                 id=str(uuid.uuid4()),
                 project_id=body.project_id,
                 stage=body.stage,
-                url=r.get("url", ""),
+                url=url,
                 title=r.get("title", ""),
                 content=r.get("summary", ""),
-                source=r.get("source", "Google News"),
+                source=r.get("source", ""),
                 crawled_at=datetime.utcnow(),
-            )
-            db.add(ref)
+            ))
         db.commit()
     return {"results": results, "count": len(results)}
 
@@ -72,16 +82,23 @@ async def crawl_search(body: SearchRequest, db: Session = Depends(get_db)):
 async def crawl_url(body: UrlRequest, db: Session = Depends(get_db)):
     result = await scrape_url(body.url)
     if body.save and not result.get("error"):
-        ref = Reference(
-            id=str(uuid.uuid4()),
-            project_id=body.project_id,
-            stage=body.stage,
-            url=result.get("url", body.url),
-            title=result.get("title", ""),
-            content=result.get("content", ""),
-            source=result.get("source", ""),
-            crawled_at=datetime.utcnow(),
-        )
-        db.add(ref)
-        db.commit()
+        url = result.get("url", body.url)
+        already = db.query(Reference).filter(
+            Reference.project_id == body.project_id,
+            Reference.url == url,
+        ).first()
+        if already:
+            result["_skipped"] = True
+        else:
+            db.add(Reference(
+                id=str(uuid.uuid4()),
+                project_id=body.project_id,
+                stage=body.stage,
+                url=url,
+                title=result.get("title", ""),
+                content=result.get("content", ""),
+                source=result.get("source", ""),
+                crawled_at=datetime.utcnow(),
+            ))
+            db.commit()
     return result

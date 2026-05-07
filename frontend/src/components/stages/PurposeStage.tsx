@@ -18,13 +18,17 @@ interface FactMeta {
   reference_summary?: string;
 }
 
+function cleanFactDisplay(text: string): string {
+  return text.replace(/\s*3-Gate\s*판정\s*:[\s\S]*/, "").trim();
+}
+
 function parseFact(content: string): { display: string; meta: FactMeta | null } {
   const idx = content.indexOf(META_SEP);
-  if (idx === -1) return { display: content, meta: null };
+  if (idx === -1) return { display: cleanFactDisplay(content), meta: null };
   try {
-    return { display: content.slice(0, idx), meta: JSON.parse(content.slice(idx + META_SEP.length)) };
+    return { display: cleanFactDisplay(content.slice(0, idx)), meta: JSON.parse(content.slice(idx + META_SEP.length)) };
   } catch {
-    return { display: content.slice(0, idx), meta: null };
+    return { display: cleanFactDisplay(content.slice(0, idx)), meta: null };
   }
 }
 
