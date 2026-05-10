@@ -229,7 +229,7 @@ _COMPANY_KEYWORDS = {"기업", "회사", "스타트업", "saas", "b2b"}
 _TIME_RE = re.compile(r"최근|최신|올해|요즘|이번\s*년")
 
 
-def _detect_category(query: str) -> str:
+def _detect_category(query: str, stage: int = 1) -> str:
     q = query.lower()
     if any(kw in q for kw in _VOC_KEYWORDS):
         return "tweet"
@@ -237,7 +237,7 @@ def _detect_category(query: str) -> str:
         return "research paper"
     if any(kw in q for kw in _COMPANY_KEYWORDS):
         return "company"
-    return "news"
+    return STAGE_CONFIG.get(stage, STAGE_CONFIG[1])["exa_category"]
 
 
 def _detect_start_date(query: str) -> Optional[str]:
@@ -282,11 +282,9 @@ async def _exa_search_nl(query: str, category: str, limit: int, start_date: Opti
 
 async def search_natural(query: str, stage: int = 1, limit: int = 8) -> List[Dict]:
     """Natural language query → auto-detect category & time filter → Exa neural search."""
-    cfg = STAGE_CONFIG.get(stage, STAGE_CONFIG[1])
-    category = _detect_category(query)
+    category = _detect_category(query, stage)
     start_date = _detect_start_date(query)
-    enriched = f"{query} {cfg['purpose']}"
-    return await _exa_search_nl(enriched, category, limit, start_date)
+    return await _exa_search_nl(query, category, limit, start_date)
 
 
 # ── 하위 호환 ──────────────────────────────────────────────────────────────────
