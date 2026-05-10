@@ -113,6 +113,8 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
   >(null);
   const [ellipsis, setEllipsis] = useState("");
   const [ollamaStatus, setOllamaStatus] = useState<"unknown" | "ok" | "offline">("unknown");
+  const [ollamaToggling, setOllamaToggling] = useState(false);
+  const [ollamaStopPending, setOllamaStopPending] = useState(false);
   const [expandedFactId, setExpandedFactId] = useState<string | null>(null);
   const [refTab, setRefTab] = useState<"all" | "pending" | "done">("all");
   const [refPage, setRefPage] = useState(0);
@@ -145,11 +147,38 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
 
   async function checkOllama() {
     try {
-      const res = await fetch("http://localhost:8000/api/analyze/models");
-      const data = await res.json();
+      const data = await api.system.ollamaStatus();
       setOllamaStatus(data.status === "ok" ? "ok" : "offline");
     } catch {
       setOllamaStatus("offline");
+    }
+  }
+
+  function handleToggleClick() {
+    if (ollamaStatus === "ok") {
+      setOllamaStopPending(true);
+    } else {
+      void executeOllamaToggle("start");
+    }
+  }
+
+  async function confirmOllamaStop() {
+    setOllamaStopPending(false);
+    await executeOllamaToggle("stop");
+  }
+
+  async function executeOllamaToggle(action: "start" | "stop") {
+    setOllamaToggling(true);
+    try {
+      if (action === "stop") {
+        await api.system.ollamaStop();
+      } else {
+        await api.system.ollamaStart();
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+      await checkOllama();
+    } finally {
+      setOllamaToggling(false);
     }
   }
 
@@ -343,35 +372,59 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             수집된 레퍼런스 ({refs.length})
           </h3>
-          {pendingRefs.length > 0 && (
-            <button
-              onClick={analyzeWithOllama}
-              disabled={analyzing || ollamaStatus === "offline"}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors font-medium flex items-center gap-1.5
-                ${analyzing
-                  ? "bg-purple-50 border-purple-200 text-purple-500 cursor-wait"
-                  : ollamaStatus === "offline"
-                  ? "bg-[#f5f5f7] border-[#e8e8ed] text-[#707070] cursor-not-allowed"
-                  : "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"}`}
-            >
-              {analyzing
-                ? <span className="w-3 h-3 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin flex-shrink-0" />
-                : <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ollamaStatus === "ok" ? "bg-emerald-500" : "bg-[#d2d2d7]"}`} />
-              }
-              {analyzing
-                ? <span className="tabular-nums">
-                    {analyzeProgress?.stage === 1
-                      ? `레퍼런스 ${analyzeProgress.batch}/${analyzeProgress.total} 팩트 추출 중`
-                      : analyzeProgress?.stage === 2
-                      ? `5Why 체인 추론 중 (${analyzeProgress.fact}/${analyzeProgress.total})`
-                      : "분석 준비 중"
-                    }{ellipsis}
-                    <span className="invisible">{".".repeat(3 - ellipsis.length)}</span>
-                  </span>
-                : `AI 자동 추출 (${pendingRefs.length}건)`
-              }
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-[#707070]">Ollama</span>
+              <button
+                role="switch"
+                aria-checked={ollamaStatus === "ok"}
+                onClick={handleToggleClick}
+                disabled={ollamaToggling || ollamaStatus === "unknown"}
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none
+                  ${ollamaToggling
+                    ? "bg-amber-300 cursor-wait"
+                    : ollamaStatus === "ok"
+                    ? "bg-emerald-500 cursor-pointer"
+                    : ollamaStatus === "offline"
+                    ? "bg-[#d2d2d7] cursor-pointer"
+                    : "bg-[#d2d2d7] opacity-50 cursor-wait"}`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out
+                    ${ollamaStatus === "ok" ? "translate-x-4" : "translate-x-0"}`}
+                />
+              </button>
+            </div>
+            {pendingRefs.length > 0 && (
+              <button
+                onClick={analyzeWithOllama}
+                disabled={analyzing || ollamaStatus === "offline"}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-colors font-medium flex items-center gap-1.5
+                  ${analyzing
+                    ? "bg-purple-50 border-purple-200 text-purple-500 cursor-wait"
+                    : ollamaStatus === "offline"
+                    ? "bg-[#f5f5f7] border-[#e8e8ed] text-[#707070] cursor-not-allowed"
+                    : "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"}`}
+              >
+                {analyzing
+                  ? <span className="w-3 h-3 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin flex-shrink-0" />
+                  : <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ollamaStatus === "ok" ? "bg-emerald-500" : "bg-[#d2d2d7]"}`} />
+                }
+                {analyzing
+                  ? <span className="tabular-nums">
+                      {analyzeProgress?.stage === 1
+                        ? `레퍼런스 ${analyzeProgress.batch}/${analyzeProgress.total} 팩트 추출 중`
+                        : analyzeProgress?.stage === 2
+                        ? `5Why 체인 추론 중 (${analyzeProgress.fact}/${analyzeProgress.total})`
+                        : "분석 준비 중"
+                      }{ellipsis}
+                      <span className="invisible">{".".repeat(3 - ellipsis.length)}</span>
+                    </span>
+                  : `AI 자동 추출 (${pendingRefs.length}건)`
+                }
+              </button>
+            )}
+          </div>
         </div>
 
         {analyzeResult && (
@@ -823,6 +876,22 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             ))}
           </div>
         </section>
+      )}
+
+      {ollamaStopPending && (
+        <div
+          className="fixed inset-0 bg-[#1d1d1f]/20 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setOllamaStopPending(false)}
+        >
+          <div className="bg-white rounded-[28px] p-6 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-[#1d1d1f] mb-1">Ollama를 종료할까요?</p>
+            <p className="text-xs text-[#707070] mb-4">분석 중 종료하면 진행 중인 작업이 중단될 수 있습니다.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setOllamaStopPending(false)} className="flex-1 text-sm bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] py-2 rounded-full transition-colors">취소</button>
+              <button onClick={confirmOllamaStop} className="flex-1 text-sm bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-full font-medium transition-colors">종료</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {pendingDelete && (

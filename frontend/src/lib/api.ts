@@ -82,7 +82,15 @@ export const api = {
     delete: (id: string) => req(`/concepts/${id}`, { method: "DELETE" }),
   },
 
+  system: {
+    ollamaStatus: () => req<{ status: string }>("/system/ollama/status"),
+    ollamaStart: () => req<{ status: string; message?: string }>("/system/ollama/start", { method: "POST" }),
+    ollamaStop: () => req<{ status: string; message?: string }>("/system/ollama/stop", { method: "POST" }),
+  },
+
   crawl: {
+    smart: (data: { natural_query: string; stage: number; project_id: string; save?: boolean }) =>
+      req("/crawl/smart", { method: "POST", body: JSON.stringify(data) }),
     news: (data: { keyword: string; domain?: string; stage: number; project_id: string; save?: boolean }) =>
       req("/crawl/news", { method: "POST", body: JSON.stringify(data) }),
     search: (data: { keyword: string; stage: number; project_id: string; save?: boolean }) =>

@@ -5,7 +5,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
-from app.routers import projects, stages, crawl, analyze
+from app.routers import projects, stages, crawl, analyze, system
 
 app = FastAPI(title="UX Planner API", version="1.0.0")
 
@@ -21,6 +21,7 @@ app.include_router(projects.router)
 app.include_router(stages.router)
 app.include_router(crawl.router)
 app.include_router(analyze.router)
+app.include_router(system.router)
 
 
 @app.on_event("startup")

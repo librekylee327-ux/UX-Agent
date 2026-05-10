@@ -10,8 +10,6 @@ interface Props {
   onSaved?: () => void;
 }
 
-type Tab = "news" | "url";
-
 const STAGE_HINTS: Record<number, string> = {
   1: "버즈리포트 · 혁신 사례 · 트렌드",
   2: "도메인 분석 · 시장 조사 · 경쟁사",
@@ -20,18 +18,8 @@ const STAGE_HINTS: Record<number, string> = {
   5: "UX 사례 · 디자인 패턴 · 레퍼런스",
 };
 
-const DOMAIN_PLACEHOLDERS: Record<number, string> = {
-  1: "예: 모바일 앱, 한국 시장",
-  2: "예: 핀테크, B2B SaaS",
-  3: "예: 10대, 직장인, 노인",
-  4: "예: 불만, 이탈, 온보딩",
-  5: "예: 앱 디자인, 대시보드 UI",
-};
-
 export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
-  const [tab, setTab] = useState<Tab>("url");
-  const [keyword, setKeyword] = useState("");
-  const [domain, setDomain] = useState("");
+  const [naturalQuery, setNaturalQuery] = useState("");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<CrawlResult[]>([]);
@@ -39,17 +27,21 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
   const [error, setError] = useState("");
 
   const hint = STAGE_HINTS[stage] ?? "";
+  const naturalDisabled = !!url.trim();
+  const urlDisabled = !!naturalQuery.trim();
+  const canSubmit = !loading && (!!naturalQuery.trim() || !!url.trim());
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
+    if (!canSubmit) return;
     setLoading(true);
     setResults([]);
     setError("");
     setSaved(new Set());
     try {
       let res: { results: CrawlResult[]; count: number };
-      if (tab === "news") {
-        res = await api.crawl.news({ keyword, domain: domain.trim() || undefined, stage, project_id: projectId, save: true }) as typeof res;
+      if (naturalQuery.trim()) {
+        res = await api.crawl.smart({ natural_query: naturalQuery.trim(), stage, project_id: projectId, save: true }) as typeof res;
       } else {
         const r = await api.crawl.url({ url, project_id: projectId, stage, save: true }) as CrawlResult;
         if (r.error) throw new Error(`스크래핑 실패: ${r.error}`);
@@ -68,78 +60,65 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
     }
   }
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: "url", label: "URL 직접입력" },
-    { id: "news", label: "뉴스" },
-  ];
-
   return (
     <div className="bg-white rounded-[28px] overflow-hidden">
       {/* Header */}
-      <div className="px-5 pt-5 pb-0">
-        <div className="flex items-center justify-between mb-3">
+      <div className="px-5 pt-5 pb-4">
+        <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-[#1d1d1f]">크롤러</h3>
             <p className="text-xs text-[#707070] mt-0.5">{hint}</p>
           </div>
           <span className="text-xs text-[#707070] bg-[#f5f5f7] px-2 py-0.5 rounded-[10px]">Stage {stage}</span>
         </div>
-
-        {/* Tabs */}
-        <div className="flex gap-1 border-b border-[#e8e8ed]">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`text-xs px-3 py-2 transition-colors border-b-2 -mb-px ${
-                tab === t.id
-                  ? "border-[#0071e3] text-[#0071e3]"
-                  : "border-transparent text-[#707070] hover:text-[#1d1d1f]"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSearch} className="p-5 space-y-3">
-        {tab !== "url" ? (
-          <div className="space-y-2">
-            <div>
-              <label className="block text-[11px] text-[#707070] mb-1 font-medium">주제어 *</label>
-              <input
-                type="text"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="예: 배달앱, 헬스케어 앱"
-                className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-[#707070] mb-1 font-medium">도메인 · 맥락 <span className="font-normal">(선택)</span></label>
-              <input
-                type="text"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                placeholder={DOMAIN_PLACEHOLDERS[stage] ?? "예: 모바일 앱, 한국 시장"}
-                className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
-              />
-            </div>
-          </div>
-        ) : (
+      <form onSubmit={handleSearch} className="px-5 pb-5 space-y-3">
+        {/* 자연어 검색 */}
+        <div className={`transition-opacity duration-150 ${naturalDisabled ? "opacity-30 pointer-events-none" : ""}`}>
+          <label className="block text-[11px] text-[#707070] mb-1 font-medium">자연어 검색</label>
+          <textarea
+            value={naturalQuery}
+            onChange={(e) => {
+              setNaturalQuery(e.target.value);
+              setResults([]);
+              setError("");
+            }}
+            disabled={naturalDisabled}
+            rows={3}
+            placeholder="예: 최근 에이전틱 서비스를 사용하는 고객의 불편 혹은 VOC를 알고 싶어"
+            className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors resize-none"
+          />
+        </div>
+
+        {/* 구분 */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-[#e8e8ed]" />
+          <span className="text-[11px] text-[#d2d2d7]">또는</span>
+          <div className="flex-1 h-px bg-[#e8e8ed]" />
+        </div>
+
+        {/* URL 직접입력 */}
+        <div className={`transition-opacity duration-150 ${urlDisabled ? "opacity-30 pointer-events-none" : ""}`}>
+          <label className="block text-[11px] text-[#707070] mb-1 font-medium">URL 직접입력</label>
           <input
             type="url"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setResults([]);
+              setError("");
+            }}
+            disabled={urlDisabled}
             placeholder="https://..."
             className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
           />
-        )}
+        </div>
+
         <button
           type="submit"
-          disabled={loading || (tab === "news" ? !keyword.trim() : !url.trim())}
+          disabled={!canSubmit}
           className="w-full bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-40 text-white text-sm font-normal py-2 rounded-full transition-colors"
         >
           {loading ? "수집 중..." : "수집 시작"}

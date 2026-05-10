@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.database import get_db
-from app.crawler import search_news, scrape_url, search_ddg
+from app.crawler import search_news, scrape_url, search_ddg, search_natural
 from app.models import Reference
 
 router = APIRouter(prefix="/api/crawl", tags=["crawl"])
@@ -76,6 +76,46 @@ async def crawl_search(body: SearchRequest, db: Session = Depends(get_db)):
             db.add(ref)
         db.commit()
     return {"results": results, "count": len(results)}
+
+
+class NLSearchRequest(BaseModel):
+    natural_query: str
+    project_id: str
+    stage: int = 1
+    save: bool = True
+
+
+@router.post("/smart")
+async def crawl_smart(body: NLSearchRequest, db: Session = Depends(get_db)):
+    try:
+        results = await search_natural(body.natural_query, body.stage, limit=8)
+        if body.save:
+            existing_urls = {
+                row.url for row in
+                db.query(Reference.url).filter(Reference.project_id == body.project_id).all()
+            }
+            for r in results:
+                if r.get("error"):
+                    continue
+                url = r.get("url", "")
+                if url in existing_urls:
+                    r["_skipped"] = True
+                    continue
+                existing_urls.add(url)
+                db.add(Reference(
+                    id=str(uuid.uuid4()),
+                    project_id=body.project_id,
+                    stage=body.stage,
+                    url=url,
+                    title=r.get("title", ""),
+                    content=r.get("summary", ""),
+                    source=r.get("source", ""),
+                    crawled_at=datetime.utcnow(),
+                ))
+            db.commit()
+        return {"results": results, "count": len(results)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/url")

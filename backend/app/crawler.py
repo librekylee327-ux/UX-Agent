@@ -1,8 +1,10 @@
 import os
+import re
 import httpx
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
-from typing import List, Dict
+from typing import List, Dict, Optional
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
@@ -212,6 +214,74 @@ async def search_by_stage(keyword: str, stage: int, limit: int = 8) -> List[Dict
         combined.extend(platum_results)
 
     return combined
+
+
+# ── 자연어 검색 ────────────────────────────────────────────────────────────────
+
+_VOC_KEYWORDS = {"불편", "voc", "피드백", "후기", "리뷰", "불만", "민원", "complaint", "feedback", "pain"}
+_PAPER_KEYWORDS = {"논문", "연구", "학술", "academic", "research", "paper", "study"}
+_COMPANY_KEYWORDS = {"기업", "회사", "스타트업", "saas", "b2b"}
+_TIME_RE = re.compile(r"최근|최신|올해|요즘|이번\s*년")
+
+
+def _detect_category(query: str) -> str:
+    q = query.lower()
+    if any(kw in q for kw in _VOC_KEYWORDS):
+        return "tweet"
+    if any(kw in q for kw in _PAPER_KEYWORDS):
+        return "research paper"
+    if any(kw in q for kw in _COMPANY_KEYWORDS):
+        return "company"
+    return "news"
+
+
+def _detect_start_date(query: str) -> Optional[str]:
+    if _TIME_RE.search(query):
+        return (datetime.utcnow() - timedelta(days=180)).strftime("%Y-%m-%d")
+    return None
+
+
+async def _exa_search_nl(query: str, category: str, limit: int, start_date: Optional[str]) -> List[Dict]:
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        exa = _get_exa_client()
+
+        def _sync():
+            kwargs: Dict = dict(
+                num_results=limit,
+                type="neural",
+                category=category,
+                text={"max_characters": 1500},
+                summary={"query": query},
+            )
+            if start_date:
+                kwargs["start_published_date"] = start_date
+            return exa.search_and_contents(query, **kwargs)
+
+        response = await loop.run_in_executor(None, _sync)
+        return [
+            {
+                "title": r.title or "",
+                "url": r.url or "",
+                "summary": r.summary or (r.text or "")[:300],
+                "content": r.text or "",
+                "source": "Exa",
+                "published_at": r.published_date or "",
+            }
+            for r in response.results
+        ]
+    except Exception as e:
+        return [_error("Exa 검색 실패", str(e))]
+
+
+async def search_natural(query: str, stage: int = 1, limit: int = 8) -> List[Dict]:
+    """Natural language query → auto-detect category & time filter → Exa neural search."""
+    cfg = STAGE_CONFIG.get(stage, STAGE_CONFIG[1])
+    category = _detect_category(query)
+    start_date = _detect_start_date(query)
+    enriched = f"{query} {cfg['purpose']}"
+    return await _exa_search_nl(enriched, category, limit, start_date)
 
 
 # ── 하위 호환 ──────────────────────────────────────────────────────────────────

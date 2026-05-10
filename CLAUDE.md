@@ -24,6 +24,36 @@ Never implement first without approval.
 
 ---
 
+## Regression Safety Rules
+
+These rules apply to every backend or frontend change, with no exceptions.
+
+### Rule 1 — Backend-first, verify before frontend
+When adding a new backend router or endpoint:
+1. Implement and register the router in `main.py`
+2. **Verify the backend starts cleanly** (`uvicorn` import check or quick startup) before touching frontend code
+3. Only integrate on the frontend after the backend endpoints are confirmed working
+
+Never write backend + frontend integration in a single step without a verification gate in between.
+
+### Rule 2 — New routers must not crash the server
+A bug inside a new router (import error, unhandled exception, missing dependency) will take down the entire FastAPI app and break all existing features.
+
+Checklist before registering a new router:
+- All imports in the new router file resolve without error
+- All endpoint functions have top-level `try/except` and return proper HTTP responses on failure — they must never raise unhandled exceptions
+- Run a quick import check: `python -c "from app.routers import <new_module>"` to catch import-time errors before startup
+
+### Rule 3 — Preserve existing API contracts when refactoring
+When replacing an existing frontend call (e.g., swapping a direct `fetch(...)` for a new `api.*` method):
+- The new endpoint must be verified working **before** removing the old call
+- Keep the old call in place as a fallback until the new endpoint is confirmed
+
+### Rule 4 — Scope changes narrowly
+A feature addition should touch only the files it needs. Do not modify existing endpoint behavior as a side effect of adding a new feature. If a refactor of an existing call is needed, treat it as a separate step and flag it explicitly.
+
+---
+
 ## Commands
 
 ### Run all (recommended)

@@ -57,11 +57,14 @@ export default function ProjectPage() {
   const [openGuides, setOpenGuides] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
-    const p = await api.projects.get(projectId) as Project;
-    setProject(p);
-    setActiveStage(p.current_stage);
-    setNameInput(p.name);
-    setLoading(false);
+    try {
+      const p = await api.projects.get(projectId) as Project;
+      setProject(p);
+      setActiveStage(p.current_stage);
+      setNameInput(p.name);
+    } finally {
+      setLoading(false);
+    }
   }, [projectId]);
 
   useEffect(() => { load(); }, [load]);
