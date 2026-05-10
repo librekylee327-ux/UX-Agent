@@ -60,20 +60,28 @@ async def crawl_news(body: SearchRequest, db: Session = Depends(get_db)):
 async def crawl_search(body: SearchRequest, db: Session = Depends(get_db)):
     results = await search_ddg(body.keyword, body.stage, limit=8)
     if body.save:
+        existing_urls = {
+            row.url for row in
+            db.query(Reference.url).filter(Reference.project_id == body.project_id).all()
+        }
         for r in results:
             if r.get("error"):
                 continue
-            ref = Reference(
+            url = r.get("url", "")
+            if url in existing_urls:
+                r["_skipped"] = True
+                continue
+            existing_urls.add(url)
+            db.add(Reference(
                 id=str(uuid.uuid4()),
                 project_id=body.project_id,
                 stage=body.stage,
-                url=r.get("url", ""),
+                url=url,
                 title=r.get("title", ""),
                 content=r.get("summary", ""),
                 source=r.get("source", "검색"),
                 crawled_at=datetime.utcnow(),
-            )
-            db.add(ref)
+            ))
         db.commit()
     return {"results": results, "count": len(results)}
 

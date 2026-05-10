@@ -136,8 +136,8 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
       {results.length > 0 && (
         <div className="px-5 pb-4 space-y-1">
           {results.map((r, i) => (
-            <div key={i} className={`text-xs px-2.5 py-1.5 rounded-[10px] border ${r.error ? "bg-rose-50 border-rose-200 text-rose-600" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
-              {r.error ? `실패: ${r.error}` : `저장됨 ✓ ${r.title || r.url}`}
+            <div key={i} className={`text-xs px-2.5 py-1.5 rounded-[10px] border ${r.error ? "bg-rose-50 border-rose-200 text-rose-600" : r._skipped ? "bg-[#f5f5f7] border-[#e8e8ed] text-[#707070]" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
+              {r.error ? `실패: ${r.error}` : r._skipped ? `이미 수집됨 ${r.title || r.url}` : `저장됨 ✓ ${r.title || r.url}`}
             </div>
           ))}
         </div>

@@ -208,10 +208,15 @@ async def search_by_stage(keyword: str, stage: int, limit: int = 8) -> List[Dict
     )
 
     combined: List[Dict] = []
-    if isinstance(exa_results, list):
-        combined.extend(exa_results)
-    if isinstance(platum_results, list):
-        combined.extend(platum_results)
+    seen_urls: set = set()
+    for batch in [exa_results, platum_results]:
+        if isinstance(batch, list):
+            for r in batch:
+                url = r.get("url", "")
+                if url and url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                combined.append(r)
 
     return combined
 

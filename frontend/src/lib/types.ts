@@ -111,6 +111,7 @@ export interface CrawlResult {
   published_at: string;
   content: string;
   error?: string;
+  _skipped?: boolean;
 }
 
 export const STAGES = [

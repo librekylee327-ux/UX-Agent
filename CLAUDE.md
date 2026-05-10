@@ -35,7 +35,7 @@ When adding a new backend router or endpoint:
 3. Only integrate on the frontend after the backend endpoints are confirmed working
 
 Never write backend + frontend integration in a single step without a verification gate in between.
-
+ㅛ7 
 ### Rule 2 — New routers must not crash the server
 A bug inside a new router (import error, unhandled exception, missing dependency) will take down the entire FastAPI app and break all existing features.
 
