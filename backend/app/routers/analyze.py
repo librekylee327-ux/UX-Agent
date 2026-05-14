@@ -80,14 +80,36 @@ def parse_ref_summary(text: str) -> str:
 
 
 # ── Stage 2: 5Why 순차 체인 추론 프롬프트 ────────────────────────────────────
-def build_why_prompt(fact: str, service: str) -> str:
-    service_part = f"서비스: {service}\n" if service else ""
-    return f"""UX 기획 분석가다. 아래 팩트의 본질적 원인을 "왜?" 5번 체인으로 역추론하라.
+def build_why_prompt(
+    fact: str,
+    service: str,
+    *,
+    fact_type: str = "",
+    reference_summary: str = "",
+) -> str:
+    meta_lines = []
+    if service:
+        meta_lines.append(f"서비스: {service}")
+    if fact_type:
+        meta_lines.append(f"유형: {fact_type}")
+    if reference_summary:
+        meta_lines.append(f"레퍼런스 맥락: {reference_summary}")
+    meta_block = ("\n".join(meta_lines) + "\n") if meta_lines else ""
+    return f"""UX 기획 분석가다. 아래 팩트의 본질적 원인을 5Why 체인으로 역추론하라.
 
-{service_part}팩트: {fact}
+{meta_block}팩트: {fact}
 
-각 A(답변)이 다음 Q(질문)의 출발점. A5에서 더이상 내려갈 수 없는 본질에 도달한다.
-마크다운 금지. Q1~Q5, A1~A5, 핵심인사이트, 인사이트등급을 아래 형식 그대로 출력하라.
+## 추론 원칙
+- Q1: 팩트에서 관찰되는 직접적·환경적 원인 (표면적이어도 된다)
+- Q2 【핵심】: A1에서 멈추지 마라.
+  레퍼런스 맥락을 전제로, 이 도메인·서비스·사용자에게 보편적이거나 일반적인 궤도(패턴, 행동, 구조)를 먼저 설정하라.
+  그런 다음 이 팩트가 그 궤도에서 얼마나, 어떻게 이격돼 있는지를 파악하라.
+  Q2는 그 이격 자체를 파고드는 질문이어야 한다 — 단순히 "A1의 원인은?"이 아니라
+  "보편적으로 [~해야 했는데], 왜 이 경우는 그 궤도에서 벗어났는가?"를 물어라
+- Q3~Q5: 이격을 만든 요인을 더 깊이. 외부→내부→구조→시스템→더 이상 내려갈 수 없는 본질로 수렴
+- 각 A(답변)가 다음 Q(질문)의 출발점. A5에서 본질에 도달한다
+
+마크다운 금지. 아래 형식 그대로 출력하라.
 
 Q1: 왜 이런 현상이 나타나는가?
 A1:
@@ -441,9 +463,13 @@ async def analyze_facts_stream(body: AnalyzeRequest, db: Session = Depends(get_d
             for attempt in range(2):
                 try:
                     raw2 = await _call_ollama(DEFAULT_MODEL,
-                                              build_why_prompt(item["f_data"]["raw_fact"],
-                                                               item["f_data"]["service"]),
-                                              num_predict=1000, num_ctx=3072, timeout=150)
+                                              build_why_prompt(
+                                                  item["f_data"]["raw_fact"],
+                                                  item["f_data"]["service"],
+                                                  fact_type=item["f_data"].get("fact_type", ""),
+                                                  reference_summary=item["f_data"].get("reference_summary", ""),
+                                              ),
+                                              num_predict=1200, num_ctx=3072, timeout=150)
                     why_data = parse_whys(raw2)
                     steps = len(why_data["chain"])
                     print(f"[reason fact={i+1} attempt={attempt+1}] chain={steps}steps", flush=True)
