@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import type { Reference, Fact, FiveWhys, WhyChainStep } from "@/lib/types";
 
-interface Props { projectId: string; refreshKey?: number; }
+interface Props { projectId: string; refreshKey?: number; crawlerSlot?: ReactNode; }
 
 const META_SEP = "\n__META__";
 
@@ -96,14 +96,11 @@ const TYPE_DESC: Record<string, string> = {
 };
 
 
-export default function PurposeStage({ projectId, refreshKey }: Props) {
+export default function PurposeStage({ projectId, refreshKey, crawlerSlot }: Props) {
   const [refs, setRefs] = useState<Reference[]>([]);
   const [facts, setFacts] = useState<Fact[]>([]);
   const [fiveWhys, setFiveWhys] = useState<FiveWhys[]>([]);
-  const [newFact, setNewFact] = useState("");
-  const [bulkInput, setBulkInput] = useState("");
-  const [showBulk, setShowBulk] = useState(false);
-  const [activeRefId, setActiveRefId] = useState<string | null>(null);
+  const [factSearch, setFactSearch] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeResult, setAnalyzeResult] = useState<{ saved: number; error?: string } | null>(null);
   const [analyzeProgress, setAnalyzeProgress] = useState<
@@ -119,6 +116,8 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
   const [refTab, setRefTab] = useState<"all" | "pending" | "done">("all");
   const [refPage, setRefPage] = useState(0);
   const [pendingDelete, setPendingDelete] = useState<{ type: "fact" | "ref" | "fw"; id: string } | null>(null);
+  const [showCriteriaModal, setShowCriteriaModal] = useState(false);
+  const [openGuides, setOpenGuides] = useState<Set<string>>(new Set(["grade", "type", "gate"]));
 
   // 5 Why 편집 상태
   const [editingFw, setEditingFw] = useState<Partial<FiveWhys> | null>(null);
@@ -258,25 +257,6 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
     setFiveWhys(fw);
   }
 
-  async function addFact(refId?: string) {
-    if (!newFact.trim()) return;
-    await api.facts.create(projectId, { content: newFact.trim(), reference_id: refId });
-    setNewFact("");
-    load();
-  }
-
-  async function addBulkFacts() {
-    const lines = bulkInput
-      .split("\n")
-      .map((l) => l.replace(/^팩트\s*\d+[:：]\s*/i, "").trim())
-      .filter(Boolean);
-    if (!lines.length) return;
-    await Promise.all(lines.map((content) => api.facts.create(projectId, { content })));
-    setBulkInput("");
-    setShowBulk(false);
-    load();
-  }
-
   async function deleteFact(id: string) {
     await api.facts.delete(id);
     setFacts((p) => p.filter((f) => f.id !== id));
@@ -364,9 +344,10 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
   const analyzedRefs = refs.filter((r) => r.analyzed);
 
   return (
-    <div className="space-y-6">
-      {/* References */}
-      <section>
+    <>
+      {/* Card 1: References + Crawler */}
+      <div className="bg-white rounded-[28px] p-5 mb-4 flex gap-5 items-start">
+        <div className="flex-1 min-w-0 pt-1">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-[#1d1d1f] flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -439,7 +420,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
         )}
 
         {refs.length === 0 ? (
-          <p className="text-xs text-[#707070] px-1">우측 크롤러에서 버즈리포트를 수집하세요</p>
+          <p className="text-xs text-[#707070] px-1">크롤러에서 버즈리포트를 수집하세요</p>
         ) : (
           <>
             <div className="flex gap-1 mb-3">
@@ -467,7 +448,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             </div>
 
             {(() => {
-              const PAGE_SIZE = 4;
+              const PAGE_SIZE = 8;
               const list = refTab === "all" ? refs : refTab === "pending" ? pendingRefs : analyzedRefs;
               const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
               const paged = list.slice(refPage * PAGE_SIZE, refPage * PAGE_SIZE + PAGE_SIZE);
@@ -484,13 +465,10 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                     ) : paged.map((r) => (
                       <div
                         key={r.id}
-                        onClick={() => !r.analyzed && setActiveRefId(activeRefId === r.id ? null : r.id)}
                         className={`relative flex flex-col justify-between p-2.5 rounded-[10px] border text-xs transition-colors h-28
                           ${r.analyzed
                             ? "bg-[#f5f5f7] border-[#e8e8ed] opacity-60"
-                            : activeRefId === r.id
-                            ? "bg-blue-50 border-blue-200 cursor-pointer"
-                            : "bg-white border-[#e8e8ed] hover:border-[#d2d2d7] cursor-pointer"}`}
+                            : "bg-white border-[#e8e8ed] hover:border-[#d2d2d7]"}`}
                       >
                         <div className="flex items-start justify-between gap-1">
                           <p className="font-medium text-[#1d1d1f] leading-snug line-clamp-3 flex-1">{r.title}</p>
@@ -532,63 +510,51 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             })()}
           </>
         )}
-      </section>
+        </div>
+        {crawlerSlot && (
+          <div className="w-[270px] flex-shrink-0 bg-[#f5f5f7] rounded-[28px] overflow-hidden">
+            {crawlerSlot}
+          </div>
+        )}
+      </div>
 
-      {/* Facts */}
-      <section>
-        <div className="flex items-center mb-3">
+      {/* Card 2: Facts */}
+      <div className="bg-white rounded-[28px] p-7 mb-4">
+        <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-[#1d1d1f] flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             유의미한 팩트 ({facts.length})
           </h3>
+          <button
+            onClick={() => setShowCriteriaModal(true)}
+            className="text-xs text-[#0071e3] hover:text-[#0066cc] transition-colors"
+          >
+            팩트 기준표
+          </button>
         </div>
 
-        {showBulk && (
-          <div className="mb-3 p-3 bg-[#f5f5f7] border border-blue-200 rounded-[10px] space-y-2">
-            <p className="text-xs text-blue-600 font-medium">Claude 응답 붙여넣기</p>
-            <p className="text-xs text-[#707070]">"팩트 1: ..." 형식으로 붙여넣으면 자동으로 파싱해서 저장합니다</p>
-            <textarea
-              value={bulkInput}
-              onChange={(e) => setBulkInput(e.target.value)}
-              rows={6}
-              placeholder={"팩트 1: 배달 앱 주문 완료 후 사용자 84%가 실시간 위치 추적을 반복 확인한다\n팩트 2: ..."}
-              className="w-full bg-white border border-[#e8e8ed] rounded-[10px] px-3 py-2.5 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] resize-none font-mono"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setBulkInput(""); setShowBulk(false); }}
-                className="flex-1 text-xs bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] py-2 rounded-full transition-colors"
-              >취소</button>
-              <button
-                onClick={addBulkFacts}
-                disabled={!bulkInput.trim()}
-                className="flex-1 text-xs bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-40 text-white py-2 rounded-full font-medium transition-colors"
-              >
-                {bulkInput.trim().split("\n").filter(Boolean).length}개 팩트 저장
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="flex gap-2 mb-3">
+        <div className="relative mb-3">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#707070] pointer-events-none">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
           <input
             type="text"
-            value={newFact}
-            onChange={(e) => setNewFact(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addFact(activeRefId ?? undefined)}
-            placeholder="팩트 직접 입력 (Enter)"
-            className="flex-1 bg-white border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
+            value={factSearch}
+            onChange={(e) => setFactSearch(e.target.value)}
+            placeholder="팩트 검색"
+            className="w-full bg-[#f5f5f7] border border-transparent rounded-[10px] pl-8 pr-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] focus:bg-white transition-colors"
           />
-          <button
-            onClick={() => addFact(activeRefId ?? undefined)}
-            disabled={!newFact.trim()}
-            className="bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-40 text-white text-sm px-4 py-2 rounded-full transition-colors"
-          >추가</button>
+          {factSearch && (
+            <button onClick={() => setFactSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#d2d2d7] hover:text-[#707070] transition-colors leading-none">×</button>
+          )}
         </div>
-        {activeRefId && <p className="text-xs text-blue-500 mb-2">선택된 레퍼런스에 연결됨</p>}
 
-        <div className="space-y-1.5">
-          {facts.map((f) => {
+        <div className="space-y-1.5 overflow-y-auto h-[600px] [scrollbar-gutter:stable]">
+          {facts.filter((f) => {
+            if (!factSearch.trim()) return true;
+            const { display } = parseFact(f.content);
+            return display.toLowerCase().includes(factSearch.toLowerCase());
+          }).map((f) => {
             const { display, meta } = parseFact(f.content);
             const isOpen = expandedFactId === f.id;
             const gradeStyle = meta?.grade ? (GRADE_STYLE[meta.grade] ?? "") : "";
@@ -600,7 +566,7 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             return (
               <div
                 key={f.id}
-                className={`bg-white border border-[#e8e8ed] rounded-[10px] ${meta ? "cursor-pointer" : ""}`}
+                className={`bg-white border border-[#e8e8ed] rounded-[10px] overflow-hidden ${meta ? "cursor-pointer" : ""}`}
               >
                 {/* 팩트 헤더 */}
                 <div
@@ -616,11 +582,6 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
                     <p className="text-sm text-[#1d1d1f] leading-snug">{display}</p>
                     <p className="text-[10px] text-[#707070] mt-1.5 tabular-nums">{formatTimestamp(f.created_at)}</p>
                   </div>
-                  {meta && (
-                    <span className="text-[#d2d2d7] text-xs flex-shrink-0 mt-0.5">
-                      {isOpen ? "▲" : "▼"}
-                    </span>
-                  )}
                 </div>
 
                 {/* 펼침 패널 */}
@@ -852,14 +813,17 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
             );
           })}
           {facts.length === 0 && (
-            <p className="text-xs text-[#707070] px-1">팩트가 없습니다. 레퍼런스를 분석하거나 직접 입력하세요.</p>
+            <p className="text-xs text-[#707070] px-1">팩트가 없습니다. 레퍼런스를 분석하세요.</p>
+          )}
+          {facts.length > 0 && factSearch.trim() && facts.filter((f) => parseFact(f.content).display.toLowerCase().includes(factSearch.toLowerCase())).length === 0 && (
+            <p className="text-xs text-[#707070] px-1">"{factSearch}"에 해당하는 팩트가 없습니다.</p>
           )}
         </div>
-      </section>
+      </div>
 
-      {/* Principles */}
+      {/* Card 3: Principles */}
       {principles.length > 0 && (
-        <section>
+        <div className="bg-white rounded-[28px] p-7 mb-4">
           <h3 className="text-sm font-semibold text-[#1d1d1f] mb-3 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             추출된 보편 원리 ({principles.length})
@@ -875,7 +839,129 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
               </div>
             ))}
           </div>
-        </section>
+        </div>
+      )}
+
+      {/* Fact Criteria Modal */}
+      {showCriteriaModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm"
+          onClick={() => setShowCriteriaModal(false)}
+        >
+          <div
+            className="bg-white rounded-[28px] w-[360px] max-h-[80vh] overflow-y-auto shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <p className="text-xs font-semibold text-[#707070] uppercase tracking-wider">팩트 분류 기준</p>
+              <button onClick={() => setShowCriteriaModal(false)} className="text-[#707070] hover:text-[#1d1d1f] text-lg leading-none">×</button>
+            </div>
+
+            {/* 인사이트 등급 */}
+            {(() => {
+              const key = "grade";
+              const open = openGuides.has(key);
+              return (
+                <div className="border-t border-[#f5f5f7]">
+                  <button
+                    onClick={() => setOpenGuides((prev) => { const n = new Set(prev); open ? n.delete(key) : n.add(key); return n; })}
+                    className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
+                  >
+                    <span className="font-medium">인사이트 등급</span>
+                    <span className="text-[#d2d2d7] text-[10px]">{open ? "▲" : "▼"}</span>
+                  </button>
+                  {open && (
+                    <div className="px-5 pb-3 space-y-1.5">
+                      {[
+                        { grade: "S", color: "text-amber-700 bg-amber-50 border-amber-200", desc: "5개 Why 레이어 모두 도출" },
+                        { grade: "A", color: "text-blue-700 bg-blue-50 border-blue-200", desc: "3개 이상 레이어 도출" },
+                        { grade: "B", color: "text-[#474747] bg-[#f5f5f7] border-[#e8e8ed]", desc: "추가 맥락이 필요한 후보" },
+                        { grade: "C", color: "text-[#707070] bg-[#f5f5f7] border-[#e8e8ed]", desc: "맥락은 있으나 구조 추론 어려움" },
+                      ].map(({ grade, color, desc }) => (
+                        <div key={grade} className="flex items-center gap-2">
+                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded border flex-shrink-0 w-6 text-center ${color}`}>{grade}</span>
+                          <p className="text-xs text-[#707070]">{desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* 팩트 유형 */}
+            {(() => {
+              const key = "type";
+              const open = openGuides.has(key);
+              return (
+                <div className="border-t border-[#f5f5f7]">
+                  <button
+                    onClick={() => setOpenGuides((prev) => { const n = new Set(prev); open ? n.delete(key) : n.add(key); return n; })}
+                    className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
+                  >
+                    <span className="font-medium">팩트 유형</span>
+                    <span className="text-[#d2d2d7] text-[10px]">{open ? "▲" : "▼"}</span>
+                  </button>
+                  {open && (
+                    <div className="px-5 pb-3 space-y-2">
+                      {[
+                        { type: "A", label: "행동 비관행", color: "text-purple-700 bg-purple-50 border-purple-200", desc: "일반 패턴에서 벗어난 서비스/사용자 행동" },
+                        { type: "B", label: "구조 변화", color: "text-emerald-700 bg-emerald-50 border-emerald-200", desc: "시장·산업·서비스 구조 변화 신호" },
+                        { type: "C", label: "사용자 이상치", color: "text-sky-700 bg-sky-50 border-sky-200", desc: "예상치 못한 사용자 반응·행동 패턴" },
+                        { type: "D", label: "수익/비용 이상", color: "text-rose-700 bg-rose-50 border-rose-200", desc: "비관행적 수익화·비용 구조 패턴" },
+                      ].map(({ type, label, color, desc }) => (
+                        <div key={type} className="flex items-start gap-2">
+                          <div className="flex-shrink-0 text-center">
+                            <span className={`text-xs font-bold px-1 py-0.5 rounded border block leading-tight ${color}`}>TYPE {type}</span>
+                            <span className={`text-xs mt-0.5 block ${color} opacity-80`}>{label}</span>
+                          </div>
+                          <p className="text-xs text-[#707070] leading-snug mt-0.5">{desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* 3-Gate */}
+            {(() => {
+              const key = "gate";
+              const open = openGuides.has(key);
+              return (
+                <div className="border-t border-[#f5f5f7]">
+                  <button
+                    onClick={() => setOpenGuides((prev) => { const n = new Set(prev); open ? n.delete(key) : n.add(key); return n; })}
+                    className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
+                  >
+                    <span className="font-medium">3-Gate 판정</span>
+                    <span className="text-[#d2d2d7] text-[10px]">{open ? "▲" : "▼"}</span>
+                  </button>
+                  {open && (
+                    <div className="px-5 pb-4 space-y-1.5">
+                      {[
+                        { gate: "Gate 1", desc: "도메인 맥락 가치" },
+                        { gate: "Gate 2", desc: "차별성" },
+                        { gate: "Gate 3", desc: "구조적 인과성" },
+                      ].map(({ gate, desc }) => (
+                        <div key={gate} className="flex items-center gap-2">
+                          <span className="text-xs text-[#707070] flex-shrink-0 w-14">{gate}</span>
+                          <p className="text-xs text-[#707070]">{desc}</p>
+                        </div>
+                      ))}
+                      <p className="text-xs text-[#707070] mt-1 leading-relaxed">
+                        1+2+3 → <span className="text-amber-600">S/A</span> &nbsp;
+                        2+3 → <span className="text-[#474747]">B</span> &nbsp;
+                        1 → <span className="text-[#707070]">C</span> &nbsp;
+                        미통과 → 노이즈
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       )}
 
       {ollamaStopPending && (
@@ -909,6 +995,6 @@ export default function PurposeStage({ projectId, refreshKey }: Props) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -23,7 +23,7 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<CrawlResult[]>([]);
-  const [saved, setSaved] = useState<Set<number>>(new Set());
+
   const [error, setError] = useState("");
 
   const hint = STAGE_HINTS[stage] ?? "";
@@ -37,7 +37,6 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
     setLoading(true);
     setResults([]);
     setError("");
-    setSaved(new Set());
     try {
       let res: { results: CrawlResult[]; count: number };
       if (naturalQuery.trim()) {
@@ -50,7 +49,6 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
       setResults(res.results || []);
       const successCount = (res.results || []).filter((r: CrawlResult) => !r.error).length;
       if (successCount > 0) {
-        setSaved(new Set(res.results.map((_: CrawlResult, i: number) => i)));
         onSaved?.();
       }
     } catch (e: unknown) {
@@ -61,7 +59,7 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-[28px] overflow-hidden">
+    <div className="bg-[#f5f5f7] rounded-[28px] overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-4">
         <div className="flex items-center justify-between">
@@ -69,7 +67,7 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
             <h3 className="text-sm font-semibold text-[#1d1d1f]">크롤러</h3>
             <p className="text-xs text-[#707070] mt-0.5">{hint}</p>
           </div>
-          <span className="text-xs text-[#707070] bg-[#f5f5f7] px-2 py-0.5 rounded-[10px]">Stage {stage}</span>
+          <span className="text-xs text-[#707070] bg-white border border-[#e8e8ed] px-2 py-0.5 rounded-[10px]">Stage {stage}</span>
         </div>
       </div>
 
@@ -88,7 +86,7 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
             disabled={naturalDisabled}
             rows={3}
             placeholder="예: 최근 에이전틱 서비스를 사용하는 고객의 불편 혹은 VOC를 알고 싶어"
-            className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors resize-none"
+            className="w-full bg-white border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors resize-none"
           />
         </div>
 
@@ -112,7 +110,7 @@ export default function CrawlerPanel({ projectId, stage, onSaved }: Props) {
             }}
             disabled={urlDisabled}
             placeholder="https://..."
-            className="w-full bg-[#f5f5f7] border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
+            className="w-full bg-white border border-[#e8e8ed] rounded-[10px] px-3 py-2 text-sm text-[#1d1d1f] placeholder-[#707070] focus:outline-none focus:border-[#0071e3] transition-colors"
           />
         </div>
 

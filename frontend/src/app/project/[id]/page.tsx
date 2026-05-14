@@ -54,7 +54,6 @@ export default function ProjectPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [crawlerRefresh, setCrawlerRefresh] = useState(0);
-  const [openGuides, setOpenGuides] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -174,136 +173,35 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        {/* Main grid */}
-        <div className="flex-1 px-6 pb-6 grid grid-cols-[1fr_280px] gap-5 items-start">
-          {/* Stage workspace */}
-          <div className="bg-white rounded-[28px] p-7 min-h-[500px]">
-            {activeStage === 1 ? (
-              <PurposeStage projectId={projectId} refreshKey={crawlerRefresh} key={`${projectId}-1`} />
-            ) : (
-              <StageComponent projectId={projectId} key={`${projectId}-${activeStage}`} />
-            )}
-          </div>
-
-          {/* Right panel */}
-          <div className="space-y-4">
-            <CrawlerPanel
+        {/* Main content */}
+        <div className="flex-1 px-6 pb-6">
+          {activeStage === 1 ? (
+            <PurposeStage
               projectId={projectId}
-              stage={activeStage}
-              onSaved={() => setCrawlerRefresh((n) => n + 1)}
+              refreshKey={crawlerRefresh}
+              key={`${projectId}-1`}
+              crawlerSlot={
+                <CrawlerPanel
+                  projectId={projectId}
+                  stage={activeStage}
+                  onSaved={() => setCrawlerRefresh((n) => n + 1)}
+                />
+              }
             />
-
-            {/* 팩트 분류 기준 — Stage 1 전용 */}
-            {activeStage === 1 && (
-              <div className="bg-white rounded-[28px] overflow-hidden">
-                <p className="text-xs font-semibold text-[#707070] uppercase tracking-wider px-5 pt-5 pb-3">팩트 분류 기준</p>
-
-                {/* 인사이트 등급 */}
-                {(() => {
-                  const key = "grade";
-                  const open = openGuides.has(key);
-                  return (
-                    <div className="border-t border-[#f5f5f7]">
-                      <button
-                        onClick={() => setOpenGuides((prev) => { const n = new Set(prev); open ? n.delete(key) : n.add(key); return n; })}
-                        className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
-                      >
-                        <span className="font-medium">인사이트 등급</span>
-                        <span className="text-[#d2d2d7] text-[10px]">{open ? "▲" : "▼"}</span>
-                      </button>
-                      {open && (
-                        <div className="px-5 pb-3 space-y-1.5">
-                          {[
-                            { grade: "S", color: "text-amber-700 bg-amber-50 border-amber-200", desc: "5개 Why 레이어 모두 도출" },
-                            { grade: "A", color: "text-blue-700 bg-blue-50 border-blue-200", desc: "3개 이상 레이어 도출" },
-                            { grade: "B", color: "text-[#474747] bg-[#f5f5f7] border-[#e8e8ed]", desc: "추가 맥락이 필요한 후보" },
-                            { grade: "C", color: "text-[#707070] bg-[#f5f5f7] border-[#e8e8ed]", desc: "맥락은 있으나 구조 추론 어려움" },
-                          ].map(({ grade, color, desc }) => (
-                            <div key={grade} className="flex items-center gap-2">
-                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded border flex-shrink-0 w-6 text-center ${color}`}>{grade}</span>
-                              <p className="text-xs text-[#707070]">{desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* 팩트 유형 */}
-                {(() => {
-                  const key = "type";
-                  const open = openGuides.has(key);
-                  return (
-                    <div className="border-t border-[#f5f5f7]">
-                      <button
-                        onClick={() => setOpenGuides((prev) => { const n = new Set(prev); open ? n.delete(key) : n.add(key); return n; })}
-                        className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
-                      >
-                        <span className="font-medium">팩트 유형</span>
-                        <span className="text-[#d2d2d7] text-[10px]">{open ? "▲" : "▼"}</span>
-                      </button>
-                      {open && (
-                        <div className="px-5 pb-3 space-y-2">
-                          {[
-                            { type: "A", label: "행동 비관행", color: "text-purple-700 bg-purple-50 border-purple-200", desc: "일반 패턴에서 벗어난 서비스/사용자 행동" },
-                            { type: "B", label: "구조 변화", color: "text-emerald-700 bg-emerald-50 border-emerald-200", desc: "시장·산업·서비스 구조 변화 신호" },
-                            { type: "C", label: "사용자 이상치", color: "text-sky-700 bg-sky-50 border-sky-200", desc: "예상치 못한 사용자 반응·행동 패턴" },
-                            { type: "D", label: "수익/비용 이상", color: "text-rose-700 bg-rose-50 border-rose-200", desc: "비관행적 수익화·비용 구조 패턴" },
-                          ].map(({ type, label, color, desc }) => (
-                            <div key={type} className="flex items-start gap-2">
-                              <div className="flex-shrink-0 text-center">
-                                <span className={`text-xs font-bold px-1 py-0.5 rounded border block leading-tight ${color}`}>TYPE {type}</span>
-                                <span className={`text-xs mt-0.5 block ${color} opacity-80`}>{label}</span>
-                              </div>
-                              <p className="text-xs text-[#707070] leading-snug mt-0.5">{desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* 3-Gate */}
-                {(() => {
-                  const key = "gate";
-                  const open = openGuides.has(key);
-                  return (
-                    <div className="border-t border-[#f5f5f7]">
-                      <button
-                        onClick={() => setOpenGuides((prev) => { const n = new Set(prev); open ? n.delete(key) : n.add(key); return n; })}
-                        className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
-                      >
-                        <span className="font-medium">3-Gate 판정</span>
-                        <span className="text-[#d2d2d7] text-[10px]">{open ? "▲" : "▼"}</span>
-                      </button>
-                      {open && (
-                        <div className="px-5 pb-4 space-y-1.5">
-                          {[
-                            { gate: "Gate 1", desc: "도메인 맥락 가치" },
-                            { gate: "Gate 2", desc: "차별성" },
-                            { gate: "Gate 3", desc: "구조적 인과성" },
-                          ].map(({ gate, desc }) => (
-                            <div key={gate} className="flex items-center gap-2">
-                              <span className="text-xs text-[#707070] flex-shrink-0 w-14">{gate}</span>
-                              <p className="text-xs text-[#707070]">{desc}</p>
-                            </div>
-                          ))}
-                          <p className="text-xs text-[#707070] mt-1 leading-relaxed">
-                            1+2+3 → <span className="text-amber-600">S/A</span> &nbsp;
-                            2+3 → <span className="text-[#474747]">B</span> &nbsp;
-                            1 → <span className="text-[#707070]">C</span> &nbsp;
-                            미통과 → 노이즈
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+          ) : (
+            <div className="grid grid-cols-[1fr_280px] gap-5 items-start">
+              <div className="bg-white rounded-[28px] p-7 min-h-[500px]">
+                <StageComponent projectId={projectId} key={`${projectId}-${activeStage}`} />
               </div>
-            )}
-          </div>
+              <div className="space-y-4">
+                <CrawlerPanel
+                  projectId={projectId}
+                  stage={activeStage}
+                  onSaved={() => setCrawlerRefresh((n) => n + 1)}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
